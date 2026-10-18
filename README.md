@@ -39,6 +39,9 @@ npm run dev:client
 
 Open `http://localhost:5173/?source=core`. Tests: `npm test` in `core/`.
 
+The website lives in `docs/` (GitHub Pages). To refresh its Bullroom demo, clone Bullroom next to this repository and
+run `node scripts/sync-demo.mjs`.
+
 ## Principles
 
 - **Local-first.** Your keys (in later stages) never leave your machine, and never with withdrawal permission.
