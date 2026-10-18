@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self'; font-src 'self'; script-src 'none'; object-src 'none'; base-uri 'self'; form-action 'none'">
+  <meta name="referrer" content="no-referrer">
+  <title>OpenSpread + Bullroom: watch the spread, keep the keys</title>
+  <meta name="description" content="Open-source, local-first tools for stablecoin spreads and crypto bots. OpenSpread reads the exchanges from your own computer; Bullroom turns your bots into a pixel-art trading floor.">
+  <meta name="color-scheme" content="dark">
+  <link rel="icon" href="assets/img/favicon-32.png" type="image/png">
+  <link rel="alternate" hreflang="pt-BR" href="pt/">
+  <link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+  <nav class="nav" aria-label="Main">
+    <div class="wrap">
+      <a class="brand" href="./"><img src="assets/img/mark.png" alt="" width="28" height="28">OpenSpread <span class="plus">+</span> <span>Bull<span class="pos">room</span></span></a>
+      <div class="links">
+        <a href="demo/?mock=trading">Demo</a>
+        <a href="#tools">Tools</a>
+        <a href="#run">Run it</a>
+        <a href="#roadmap">Roadmap</a>
+        <a href="https://github.com/JVMarks/OpenSpread">GitHub</a>
+      </div>
+      <a class="lang" href="pt/" hreflang="pt-BR" lang="pt-BR">Português</a>
+    </div>
+  </nav>
+
+  <header class="hero">
+    <div class="wrap">
+      <span class="pill amber">OPEN SOURCE · LOCAL-FIRST</span>
+      <h1>Watch the spread.<br><span class="g">Keep the keys.</span></h1>
+      <p class="lead">OpenSpread reads the exchanges from your own computer and shows the real net spread after fees. Bullroom turns your bots into a pixel-art trading floor.</p>
+      <div class="cta">
+        <a class="btn primary" href="demo/?mock=trading">▶ Try the demo</a>
+        <a class="btn ghost" href="#run">Get the code</a>
+      </div>
+    </div>
+    <div class="tape" aria-label="Sample read">
+      <div class="wrap">
+        <span><b>USDC/USDT</b><span class="neg">−0.205%</span></span>
+        <span><b>USDE/USDT</b><span class="neg">−0.21%</span></span>
+        <span><b>BINANCE</b><span class="pos">+0.1 bp</span></span>
+        <span><b>OKX</b><span class="pos">+0.2 bp</span></span>
+        <span><b>BYBIT</b><span class="pos">+0.2 bp</span></span>
+        <span><b>KRAKEN</b><span class="pos">+0.2 bp</span></span>
+        <span><b>COINBASE</b><span class="neg">−0.8 bp</span></span>
+      </div>
+    </div>
+    <p class="tape-note">Read on Oct 18, 2026, 23:37 UTC · pairs: best net spread after both taker fees · exchanges: USDC/USDT price vs. the room average</p>
+  </header>
+
+  <main>
+    <section class="block" aria-labelledby="see">
+      <div class="wrap">
+        <div class="kicker">WHAT YOU SEE</div>
+        <h2 id="see">Every exchange is a trader. Every pair is a room.</h2>
+        <p class="sub">Five exchanges, read live and read-only. The sign on each room shows the best spread between them after fees. Today it is negative: the gap is real, and the fees eat it.</p>
+        <figure>
+          <div class="shot">
+            <span class="pill amber">REAL DATA · READ-ONLY</span>
+            <img src="assets/img/live-en-US.webp" alt="Bullroom showing two rooms, USDC/USDT and USDE/USDT, with Binance, OKX, Bybit, Kraken and Coinbase as characters and the best net spread on each room sign" width="1600" height="900" loading="lazy">
+          </div>
+          <figcaption>Bullroom reading OpenSpread on Oct 18, 2026. No API keys, no orders, no server of ours.</figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <section class="block" id="tools" aria-labelledby="tools-h">
+      <div class="wrap">
+        <div class="kicker">TWO TOOLS</div>
+        <h2 id="tools-h">The engine and the window.</h2>
+        <div class="cards">
+          <article class="card">
+            <img src="assets/img/sign.webp" alt="Bullroom reception sign in scoreboard style" width="900" height="420" loading="lazy">
+            <div class="body">
+              <h3>OpenSpread</h3>
+              <p class="role">The engine, on your computer.</p>
+              <ul>
+                <li>Reads public prices from Binance, OKX, Bybit, Kraken and Coinbase.</li>
+                <li>Shows the net spread after both taker fees. Negative stays negative.</li>
+                <li>Serves it locally on <code>127.0.0.1</code>. Nothing leaves your machine.</li>
+                <li>Next: paper trading, your own Claude or Codex designing strategies, orders behind a risk policy.</li>
+              </ul>
+              <div class="actions"><a class="btn ghost" href="https://github.com/JVMarks/OpenSpread">OpenSpread on GitHub</a></div>
+            </div>
+          </article>
+          <article class="card">
+            <img src="assets/img/sim-en-US.webp" alt="Bullroom simulated trading floor with bots at desks, PnL over their heads and a trade feed" width="1600" height="900" loading="lazy">
+            <div class="body">
+              <h3>Bull<span class="pos">room</span></h3>
+              <p class="role">The window: your bots as an office.</p>
+              <ul>
+                <li>Seated means in a position; walking around means flat.</li>
+                <li>PnL floats over each head; the room sign sums the room.</li>
+                <li>A bot that hits its daily loss limit is ejected from the room.</li>
+                <li>Simulated in the browser, or live with OpenSpread.</li>
+              </ul>
+              <div class="actions">
+                <a class="btn primary" href="demo/?mock=trading">▶ Try the demo</a>
+                <a class="btn ghost" href="https://github.com/JVMarks/bullroom">Bullroom on GitHub</a>
+              </div>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="block" id="run" aria-labelledby="run-h">
+      <div class="wrap">
+        <div class="kicker">RUN IT</div>
+        <h2 id="run-h">Two repositories. Node 22.12 or newer.</h2>
+        <div class="runs">
+          <div>
+            <h3>1. OpenSpread (live prices)</h3>
+<pre>git clone https://github.com/JVMarks/OpenSpread.git
+cd OpenSpread/core
+npm install
+npm start
+<span class="c"># OpenSpread core on 127.0.0.1:4848 (read-only)</span></pre>
+          </div>
+          <div>
+            <h3>2. Bullroom (the window)</h3>
+<pre>git clone https://github.com/JVMarks/bullroom.git
+cd bullroom
+npm install
+npm run dev:client
+<span class="c"># open http://localhost:5173/?source=core</span></pre>
+          </div>
+        </div>
+        <p class="hint">Only Bullroom? Open <code>?mock=trading</code> for simulated bots, no exchange needed. Installers for Windows and Linux are on the roadmap.</p>
+      </div>
+    </section>
+
+    <section class="block" aria-labelledby="rules">
+      <div class="wrap">
+        <div class="kicker">PRINCIPLES</div>
+        <h2 id="rules">What does not change.</h2>
+        <div class="grid4">
+          <div class="tile"><b>Local-first</b><p>No server of ours, no cookies, no tracking. It runs on your computer.</p></div>
+          <div class="tile"><b>Your keys stay home</b><p>When keys arrive, they stay on your machine, never with withdrawal permission.</p></div>
+          <div class="tile"><b>The AI proposes</b><p>The engine executes, inside a risk policy you set. The AI never sends an order.</p></div>
+          <div class="tile"><b>Honest numbers</b><p>Losses are shown. Simulated is always labeled. Negative stays negative.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="block" id="roadmap" aria-labelledby="road-h">
+      <div class="wrap">
+        <div class="kicker">ROADMAP</div>
+        <h2 id="road-h">Built in stages, in the open.</h2>
+        <ol class="road">
+          <li><span class="st done">DONE</span><span>Bullroom: simulated bots, PnL over heads, room signs, bot card with 5m/1h/24h.</span></li>
+          <li><span class="st done">DONE</span><span>OpenSpread core: live, read-only net spreads from five exchanges.</span></li>
+          <li><span class="st next">NEXT</span><span>Economic calendar and alerts in the room; machine room (API limits, latency).</span></li>
+          <li><span class="st later">LATER</span><span>Paper trading and backtests with Hummingbot.</span></li>
+          <li><span class="st later">LATER</span><span>MCP: your own Claude or Codex designing and testing strategies.</span></li>
+          <li><span class="st later">LATER</span><span>Real orders behind a risk policy; Nostr for identity and signed analyses.</span></li>
+        </ol>
+      </div>
+    </section>
+
+    <section class="block" aria-labelledby="support-h">
+      <div class="wrap">
+        <div class="support">
+          <div>
+            <h2 id="support-h">Support the project</h2>
+            <p>Donations: coming soon. Meanwhile, a star on GitHub helps.</p>
+          </div>
+          <div class="cta">
+            <a class="btn ghost" href="https://github.com/JVMarks/OpenSpread">★ OpenSpread</a>
+            <a class="btn ghost" href="https://github.com/JVMarks/bullroom">★ Bullroom</a>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <p class="warn">Educational project. Not financial advice. No promise of returns.</p>
+      <p>Bullroom is a fork of <a href="https://github.com/marmottajr/habblaud">habblaud</a> by Márcio Junior (MIT). Market data via <a href="https://github.com/ccxt/ccxt">CCXT</a> (MIT). Fonts: Pixelify Sans and Poppins (<a href="assets/fonts/OFL-PixelifySans.txt">OFL</a>).</p>
+      <p>OpenSpread and Bullroom are MIT licensed. A bitcoin100treta project. · <a href="pt/" hreflang="pt-BR" lang="pt-BR">Português</a></p>
+    </div>
+  </footer>
+</body>
+</html>
