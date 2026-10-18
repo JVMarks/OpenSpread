@@ -9,7 +9,7 @@
     "node": ">=22.12"
   },
   "scripts": {
-    "start": "tsx src/main.ts",
+    "start": "node --import tsx src/main.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "check:exchanges": "tsx scripts/check-exchanges.ts"
