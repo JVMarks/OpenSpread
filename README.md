@@ -55,7 +55,10 @@ a risk policy → Nostr for identity, signed analyses and donations.
 
 ## Support
 
-Donations: coming soon.
+Free and open source, funded only by donations (voluntary gifts: they buy no product, service or advice).
+
+- **Lightning:** `sickfog79@walletofsatoshi.com`
+- **Bitcoin on-chain:** `bc1qwk9qmeqm3fwc5q29yu945z0tuvn2yqwvf3wt9cayt5s886lcuhssejj98j`
 
 ## License
 

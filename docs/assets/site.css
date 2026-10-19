@@ -99,6 +99,13 @@ code { font: 500 .92em ui-monospace, Consolas, monospace; background: #05080b; b
 .support { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 30px; display: flex; gap: 24px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
 .support p { margin: 0; color: var(--muted); }
 .support h2 { margin: 0 0 4px; }
+/* doação: endereços selecionáveis e link que abre a carteira (sem JavaScript) */
+.donate { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 18px; }
+.donate > * { min-width: 0; }
+.addr { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 20px; display: flex; flex-direction: column; gap: 12px; align-items: flex-start; }
+.addr p { margin: 0; color: var(--muted); font-size: 14px; }
+code.sel { display: block; width: 100%; font-size: 14px; padding: 10px 12px; word-break: break-all; user-select: all; color: var(--text); }
+@media (max-width: 900px) { .donate { grid-template-columns: 1fr; } }
 footer { margin-top: 96px; border-top: 1px solid var(--line); padding: 32px 0 48px; color: var(--muted); font-size: 14px; }
 footer .wrap { display: grid; gap: 10px; }
 footer .warn { color: var(--text); }
