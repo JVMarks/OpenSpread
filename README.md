@@ -4,7 +4,7 @@
 the exchanges you choose, shows the real net spread after fees, and (in later stages) lets your own Claude or Codex
 design and test bots. No server of ours, no tracking. *A bitcoin100treta project.*
 
-**Website and live demo:** https://jvmarks.github.io/OpenSpread/
+**Website and live demo:** https://bullroom.vercel.app
 **Visual companion:** [Bullroom](https://github.com/JVMarks/bullroom), your bots as an animated pixel-art office.
 
 > **Current stage: read-only.** The core reads public market data only. No API keys, no orders, no custody.
@@ -39,7 +39,7 @@ npm run dev:client
 
 Open `http://localhost:5173/?source=core`. Tests: `npm test` in `core/`.
 
-The website lives in `docs/` (GitHub Pages). To refresh its Bullroom demo, clone Bullroom next to this repository and
+The website lives in `docs/` (deployed on Vercel from this folder). To refresh its Bullroom demo, clone Bullroom next to this repository and
 run `node scripts/sync-demo.mjs`.
 
 ## Principles
