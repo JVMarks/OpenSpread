@@ -151,6 +151,17 @@ footer .warn { color: var(--text); }
 @keyframes blink { 50% { opacity: 0; } }
 @keyframes marquee { to { transform: translateX(-50%); } }
 @keyframes reveal { from { opacity: 0; transform: translateY(18px) scale(.985); } to { opacity: 1; transform: none; } }
+@keyframes slide { from { opacity: 0; transform: translateX(-14px); } to { opacity: 1; transform: none; } }
+@keyframes type { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+@keyframes stamp { from { opacity: 0; transform: scale(1.5); } to { opacity: 1; transform: none; } }
+@keyframes pulse { 50% { opacity: .25; } }
+
+/* terminal: prompt desenhado (não vai junto ao copiar), linhas como inline-block para o recorte da digitação */
+pre .ln { display: inline-block; }
+pre .cmd::before { content: "$ "; color: var(--green); }
+/* roadmap: LED da etapa em andamento */
+.road .st { white-space: nowrap; flex-shrink: 0; min-width: 88px; }
+.road .next::before { content: ""; display: inline-block; width: 7px; height: 7px; margin-right: 8px; vertical-align: 1px; background: var(--amber); }
 
 /* cursor de pixel depois da segunda linha do título */
 .caret { display: inline-block; width: .42em; height: .78em; margin-left: .12em; vertical-align: -.04em; background: var(--green); }
@@ -159,10 +170,15 @@ footer .warn { color: var(--text); }
 .btn { transition: transform 160ms var(--ease-out), background-color 160ms ease, border-color 160ms ease; }
 .btn:active { transform: scale(.97); }
 .card, .addr, .tile { transition: border-color 200ms ease; }
+/* translate/scale independentes: somam com o transform do aparecimento ao rolar em vez de brigar com ele */
+.card { transition: translate 260ms var(--ease-out), border-color 200ms ease; }
+.card img { transition: scale 600ms var(--ease-out); }
 @media (hover: hover) and (pointer: fine) {
   .btn:hover { transform: translateY(-1px); }
   .btn.ghost:hover { border-color: var(--green); }
   .card:hover, .addr:hover, .tile:hover { border-color: #2f4256; }
+  .card:hover { translate: 0 -3px; }
+  .card:hover img { scale: 1.035; }
   .tape:hover .tape-track { animation-play-state: paused; }
 }
 
@@ -188,7 +204,22 @@ footer .warn { color: var(--text); }
       animation-timeline: view();
       animation-range: entry 0% entry 55%;
     }
+    /* Tools: os itens da lista entram um a um, cada um pela própria posição */
+    .card li { animation: slide linear both; animation-timeline: view(); animation-range: entry 20% entry 100%; }
+    /* Run it: os comandos são digitados linha a linha enquanto o terminal sobe na tela */
+    .runs pre { view-timeline: --term block; }
+    .runs pre .ln { animation: type steps(18, end) both; animation-timeline: --term; }
+    .runs pre .ln:nth-child(1) { animation-range: cover 6% cover 13%; }
+    .runs pre .ln:nth-child(2) { animation-range: cover 13% cover 18%; }
+    .runs pre .ln:nth-child(3) { animation-range: cover 18% cover 23%; }
+    .runs pre .ln:nth-child(4) { animation-range: cover 23% cover 28%; }
+    .runs pre .ln:nth-child(5) { animation-range: cover 28% cover 35%; }
+    /* Roadmap: etapas entram da esquerda, como uma linha do tempo; o selo FEITO carimba logo depois */
+    .road > li { animation-name: slide; }
+    .road .done { animation: stamp linear both; animation-timeline: view(); animation-range: entry 60% entry 100%; }
   }
+  /* LED da etapa em andamento pisca devagar (indica estado, não decora) */
+  .road .next::before { animation: pulse 1.6s ease-in-out infinite; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -197,4 +228,5 @@ footer .warn { color: var(--text); }
   .tape-group[aria-hidden="true"] { display: none; }
   .tape-track { width: auto; justify-content: center; }
   .tape-group { flex-wrap: wrap; justify-content: center; row-gap: 10px; }
+  .card:hover, .card:hover img { translate: none; scale: none; }
 }
