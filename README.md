@@ -1,3 +1,5 @@
+<p align="center"><img src="docs/assets/img/mascot-trader.webp" alt="Bullroom mascot: a golden bull robot trading at a monitor" width="160"></p>
+
 # OpenSpread
 
 **Open-source, local-first hub for stablecoin arbitrage and crypto trading.** It runs on your own computer, reads
