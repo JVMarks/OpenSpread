@@ -51,3 +51,53 @@ export interface CoreState {
   /** Só pares com 2 ou mais corretoras ativas. */
   pairs: PairState[];
 }
+
+/** O que o núcleo lê e com que frequência (arquivo ~/.openspread/config.json; GET/PUT /v1/config). Sem chaves. */
+export interface CoreConfig {
+  /** Ids da CCXT (ex.: "binance", "coinbaseexchange"). */
+  exchanges: string[];
+  /** Pares no sentido do OpenSpread (ex.: "USDC/USDT"). */
+  pairs: string[];
+  /** Intervalo entre leituras, em ms. */
+  pollMs: number;
+}
+
+export interface ConfigLimits {
+  minExchanges: number;
+  maxExchanges: number;
+  maxPairs: number;
+  minPollMs: number;
+  maxPollMs: number;
+}
+
+/** Resposta de GET /v1/config. */
+export interface ConfigInfo {
+  config: CoreConfig;
+  limits: ConfigLimits;
+  /** Todas as corretoras que a CCXT instalada conhece. */
+  known: string[];
+}
+
+/** Um par numa corretora, na conferência (POST /v1/check). */
+export interface Listing {
+  pair: string;
+  /** Símbolo na corretora; null = não lista. */
+  symbol: string | null;
+  inverted: boolean;
+  active: boolean;
+  /** Taxa taker padrão pública (fração); null quando não lista ou não informa. */
+  takerFee: number | null;
+}
+
+export interface CheckExchange {
+  id: string;
+  ok: boolean;
+  error?: string;
+  listings: Listing[];
+}
+
+/** Resposta de POST /v1/check. */
+export interface CheckResult {
+  at: number;
+  exchanges: CheckExchange[];
+}

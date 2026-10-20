@@ -78,6 +78,52 @@ describe('Poller', () => {
     expect(logs[0]).toContain('b');
   });
 
+  it('reconfigure troca corretoras e pares sem reiniciar e descarta o que saiu', async () => {
+    const BTC = { 'BTC/USDT': { active: true, taker: 0.001 } };
+    const both = { ...USDC, ...BTC };
+    const tick = { 'USDC/USDT': { bid: 1, ask: 1.001 }, 'BTC/USDT': { bid: 60_000, ask: 60_010 } };
+    const ex: Record<string, ExchangeLike> = { a: fake(both, tick), b: fake(both, tick), c: fake(both, tick) };
+    const p = new Poller(['a', 'b'], ['USDC/USDT'], { create: (id) => ex[id] });
+    await p.pollOnce(NOW);
+    const rev = p.state(NOW).rev;
+    p.reconfigure(['b', 'c'], ['BTC/USDT']);
+    expect(p.state(NOW).rev).toBeGreaterThan(rev);
+    expect(p.state(NOW).pairs).toEqual([]);
+    expect(p.state(NOW).exchanges.map((e) => e.id)).toEqual(['b', 'c']);
+    await p.pollOnce(NOW + 10_000);
+    const s = p.state(NOW + 10_000);
+    expect(s.pairs.map((x) => x.pair)).toEqual(['BTC/USDT']);
+    expect(s.pairs[0].quotes.map((q) => q.exchange).sort()).toEqual(['b', 'c']);
+  });
+
+  it('check diz o que cada corretora lista (direto, invertido, inativo, ausente) e isola a que falha', async () => {
+    const ex: Record<string, ExchangeLike> = {
+      a: fake({ ...USDC, 'DAI/USDT': { active: false, taker: 0.002 } }, {}),
+      cb: fake({ 'USDT/USDC': { active: true, taker: 0.006 } }, {}),
+      down: { loadMarkets: async () => Promise.reject(new Error('Service   unavailable')), fetchTicker: async () => ({}) },
+    };
+    const p = new Poller([], [], { create: (id) => ex[id] });
+    const r = await p.check(['a', 'cb', 'down'], ['USDC/USDT', 'DAI/USDT'], NOW);
+    expect(r.at).toBe(NOW);
+    const [a, cb, down] = r.exchanges;
+    expect(a.listings).toEqual([
+      { pair: 'USDC/USDT', symbol: 'USDC/USDT', inverted: false, active: true, takerFee: 0.001 },
+      { pair: 'DAI/USDT', symbol: 'DAI/USDT', inverted: false, active: false, takerFee: 0.002 },
+    ]);
+    expect(cb.listings[0]).toEqual({ pair: 'USDC/USDT', symbol: 'USDT/USDC', inverted: true, active: true, takerFee: 0.006 });
+    expect(cb.listings[1].symbol).toBeNull();
+    expect(down).toMatchObject({ ok: false, error: 'Service unavailable' });
+    expect(down.listings.every((l) => l.symbol === null)).toBe(true);
+  });
+
+  it('check desiste da corretora que não responde a tempo', async () => {
+    const hang: ExchangeLike = { loadMarkets: () => new Promise(() => {}), fetchTicker: async () => ({}) };
+    const p = new Poller([], [], { create: () => hang, checkTimeoutMs: 30 });
+    const r = await p.check(['slow'], ['USDC/USDT'], NOW);
+    expect(r.exchanges[0]).toMatchObject({ ok: false });
+    expect(r.exchanges[0].error).toContain('sem resposta');
+  });
+
   it('rev sobe quando algo muda', async () => {
     const ex: Record<string, ExchangeLike> = { a: fake(USDC, { 'USDC/USDT': { bid: 1, ask: 1.001 } }) };
     const p = new Poller(['a'], ['USDC/USDT'], { create: (id) => ex[id] });

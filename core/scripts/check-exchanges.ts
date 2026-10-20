@@ -1,26 +1,31 @@
-// Confere, só com dados públicos, quais pares de stablecoins cada corretora lista (direto ou invertido) e a taxa
-// taker padrão de cada um. Uso: npm run check:exchanges
+// Confere, só com dados públicos, quais pares cada corretora lista (direto ou invertido) e a taxa taker padrão.
+// Usa as corretoras e os pares do arquivo de configuração; pares passados na linha de comando substituem os do arquivo
+// (não grava nada). Uso: npm run check:exchanges  ou  npm run check:exchanges -- BTC/USDT ETH/USDT
 import ccxt from 'ccxt';
+import { configPath, loadConfig, validateConfig } from '../src/config';
+import { Poller } from '../src/poller';
 
-const EXCHANGES = ['binance', 'okx', 'bybit', 'kraken', 'coinbaseexchange'] as const;
-const PAIRS = ['USDC/USDT', 'DAI/USDT', 'FDUSD/USDT', 'USDE/USDT'] as const;
-
-const invert = (pair: string): string => pair.split('/').reverse().join('/');
-
-for (const id of EXCHANGES) {
-  const Ctor = (ccxt as unknown as Record<string, new (o: object) => { loadMarkets(): Promise<Record<string, { taker?: number; active?: boolean }>> }>)[id];
-  const ex = new Ctor({ enableRateLimit: true });
-  try {
-    const markets = await ex.loadMarkets();
-    const cells = PAIRS.map((p) => {
-      const direct = markets[p];
-      const inv = markets[invert(p)];
-      if (direct) return `${p}: direto (taker ${direct.taker}, ativo ${direct.active})`;
-      if (inv) return `${p}: invertido ${invert(p)} (taker ${inv.taker}, ativo ${inv.active})`;
-      return `${p}: -`;
-    });
-    console.log(`${id}\n  ${cells.join('\n  ')}`);
-  } catch (e) {
-    console.log(`${id}: ERRO ${(e as Error).message.slice(0, 120)}`);
+const known: readonly string[] = ccxt.exchanges;
+const config = loadConfig(configPath(), known, console.log);
+const args = process.argv.slice(2);
+let pairs = config.pairs;
+if (args.length) {
+  const v = validateConfig({ exchanges: config.exchanges, pairs: args }, known);
+  if (!v.ok) {
+    console.error(v.errors.join('\n'));
+    process.exit(1);
   }
+  pairs = v.config.pairs;
+}
+
+const result = await new Poller(config.exchanges, pairs).check(config.exchanges, pairs);
+for (const ex of result.exchanges) {
+  if (!ex.ok) {
+    console.log(`${ex.id}: ERRO ${ex.error}`);
+    continue;
+  }
+  const cells = ex.listings.map((l) =>
+    l.symbol === null ? `${l.pair}: -` : `${l.pair}: ${l.inverted ? `invertido ${l.symbol}` : 'direto'} (taker ${l.takerFee}, ativo ${l.active})`,
+  );
+  console.log(`${ex.id}\n  ${cells.join('\n  ')}`);
 }

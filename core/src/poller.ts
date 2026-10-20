@@ -2,7 +2,7 @@
 // Uma corretora com erro (fora do ar, bloqueada no país) não derruba as outras; o log só registra mudança de estado.
 import ccxt from 'ccxt';
 import { bestOpportunity, freshQuotes, MAX_QUOTE_AGE_MS, normalizeQuote } from './spread';
-import type { CoreState, ExchangeStatus, Quote } from './types';
+import type { CheckResult, CoreState, ExchangeStatus, Listing, Quote } from './types';
 
 /** O pedaço da CCXT que o núcleo usa (permite corretoras falsas nos testes). */
 export interface ExchangeLike {
@@ -14,9 +14,20 @@ export interface PollerOptions {
   create?: (id: string) => ExchangeLike;
   log?: (msg: string) => void;
   maxAgeMs?: number;
+  /** Tempo-limite de cada corretora na conferência (POST /v1/check). */
+  checkTimeoutMs?: number;
 }
 
 const invert = (pair: string): string => pair.split('/').reverse().join('/');
+
+/** Rejeita se a promessa não resolver a tempo; o cronômetro é sempre cancelado. */
+function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
+  let timer: NodeJS.Timeout | undefined;
+  const limit = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`sem resposta em ${ms / 1000} s`)), ms);
+  });
+  return Promise.race([p, limit]).finally(() => clearTimeout(timer));
+}
 
 /** Corretora real da CCXT, com o limitador de taxa ligado. */
 export function createCcxtExchange(id: string): ExchangeLike {
@@ -38,6 +49,39 @@ export class Poller {
     private pairs: readonly string[],
     private opts: PollerOptions = {},
   ) {}
+
+  /** Troca corretoras e pares sem reiniciar: refaz o mapa de símbolos e descarta o que saiu. */
+  reconfigure(ids: readonly string[], pairs: readonly string[]): void {
+    this.ids = [...ids];
+    this.pairs = [...pairs];
+    this.symbols.clear();
+    for (const [k, q] of this.quotes) if (!ids.includes(q.exchange) || !pairs.includes(q.pair)) this.quotes.delete(k);
+    for (const id of [...this.status.keys()]) if (!ids.includes(id)) this.status.delete(id);
+    for (const id of [...this.exchanges.keys()]) if (!ids.includes(id)) this.exchanges.delete(id);
+    this.rev++;
+  }
+
+  /** Confere, sem mudar nada, o que cada corretora lista (direto ou invertido), se está ativo e a taxa taker. */
+  async check(ids: readonly string[], pairs: readonly string[], now = Date.now()): Promise<CheckResult> {
+    const timeoutMs = this.opts.checkTimeoutMs ?? 20_000;
+    const one = async (id: string) => {
+      const empty = (pair: string): Listing => ({ pair, symbol: null, inverted: false, active: false, takerFee: null });
+      try {
+        const markets = await withTimeout(this.exchange(id).loadMarkets(), timeoutMs);
+        const listings = pairs.map((pair): Listing => {
+          const found = [pair, invert(pair)].map((symbol) => ({ symbol, m: markets[symbol] })).filter((x) => x.m);
+          const pick = found.find((x) => x.m!.active !== false) ?? found[0];
+          if (!pick) return empty(pair);
+          return { pair, symbol: pick.symbol, inverted: pick.symbol !== pair, active: pick.m!.active !== false, takerFee: pick.m!.taker ?? null };
+        });
+        return { id, ok: true, listings };
+      } catch (e) {
+        const error = (e instanceof Error ? e.message : String(e)).replace(/\s+/g, ' ').slice(0, 160);
+        return { id, ok: false, error, listings: pairs.map(empty) };
+      }
+    };
+    return { at: now, exchanges: await Promise.all(ids.map(one)) };
+  }
 
   /** Uma rodada em todas as corretoras, em paralelo. */
   async pollOnce(now = Date.now()): Promise<void> {
