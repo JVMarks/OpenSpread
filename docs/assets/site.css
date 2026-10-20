@@ -126,3 +126,15 @@ footer .warn { color: var(--text); }
   .grid4 { grid-template-columns: 1fr; }
   .brand { font-size: 17px; }
 }
+
+/* redes da bitcoin100treta: ícones Simple Icons (CC0) embutidos, na cor do texto */
+.follow { margin-top: 28px; }
+.follow h3 { margin: 0 0 2px; font-size: 18px; }
+.follow p { margin: 0 0 14px; color: var(--muted); font-size: 14px; }
+.social { display: flex; flex-wrap: wrap; gap: 10px; }
+.social a { display: inline-flex; align-items: center; gap: 8px; padding: 9px 16px; border: 1px solid var(--line); border-radius: 999px; color: var(--text); text-decoration: none; font-size: 14px; background: var(--panel); }
+.social svg, .social-mini svg { width: 18px; height: 18px; fill: currentColor; flex: none; }
+.social a:hover, .social a:focus-visible, .social-mini a:hover, .social-mini a:focus-visible { color: var(--green); border-color: var(--green); }
+.social a:focus-visible, .social-mini a:focus-visible { outline: 2px solid var(--amber); outline-offset: 3px; }
+.social-mini { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
+.social-mini a { display: inline-flex; padding: 8px; border: 1px solid var(--line); border-radius: 8px; color: var(--muted); }
