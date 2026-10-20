@@ -38,7 +38,7 @@ figure { margin: 0; }
 .pill { display: inline-block; font-family: Pixel, sans-serif; font-size: 12px; letter-spacing: .08em; padding: 3px 8px; border: 1px solid; border-radius: 4px; }
 
 /* topo (placar) */
-.hero { text-align: center; padding: 72px 0 0; background: radial-gradient(ellipse at top, #10261a 0, var(--bg) 62%); }
+.hero { text-align: center; padding: 40px 0 0; background: radial-gradient(ellipse at top, #10261a 0, var(--bg) 62%); }
 .hero h1 { font-family: Pixel, sans-serif; font-weight: 500; font-size: clamp(42px, 8vw, 108px); line-height: .98; margin: 18px 0 0; }
 .hero h1 .g { color: var(--green); }
 .hero .lead { max-width: 660px; margin: 22px auto 30px; color: var(--muted); font-size: 18px; }
@@ -101,6 +101,12 @@ code { font: 500 .92em ui-monospace, Consolas, monospace; background: #05080b; b
 /* apoio e rodapé */
 .support { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 30px; display: flex; gap: 24px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
 .support p { margin: 0; color: var(--muted); }
+/* mascote: no topo, espiando por baixo do bloco de apoio e ao lado de "acompanhe" */
+.hero .mascot { display: block; height: 120px; width: auto; margin: 0 auto 14px; }
+.support-text { flex: 1; min-width: 220px; }
+.mascot-peek { height: 112px; width: auto; align-self: flex-end; margin: -12px 0 -30px; }
+.mascot-side { float: right; height: 84px; width: auto; margin: 0 0 8px 16px; }
+@media (max-width: 640px) { .mascot-peek { display: none; } .mascot-side { height: 64px; } }
 .support h2 { margin: 0 0 4px; }
 /* doação: endereços selecionáveis e link que abre a carteira (sem JavaScript) */
 .donate { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 18px; }
@@ -183,15 +189,16 @@ pre .cmd::before { content: "$ "; color: var(--green); }
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  /* entrada em sequência: selo, linha 1, linha 2, texto, botões (60 ms entre cada) */
-  .hero .pill, .hero h1 .l1, .hero h1 .g, .hero .lead, .hero .cta { animation: rise 700ms var(--ease-out) both; }
+  /* entrada em sequência: mascote, selo, linha 1, linha 2, texto, botões (60 ms entre cada) */
+  .hero .mascot, .hero .pill, .hero h1 .l1, .hero h1 .g, .hero .lead, .hero .cta { animation: rise 700ms var(--ease-out) both; }
   /* span só aceita transform como inline-block */
   .hero h1 .l1, .hero h1 .g { display: inline-block; }
-  .hero .pill { animation-delay: 0ms; }
-  .hero h1 .l1 { animation-delay: 60ms; }
-  .hero h1 .g { animation-delay: 120ms; }
-  .hero .lead { animation-delay: 180ms; }
-  .hero .cta { animation-delay: 240ms; }
+  .hero .mascot { animation-delay: 0ms; }
+  .hero .pill { animation-delay: 60ms; }
+  .hero h1 .l1 { animation-delay: 120ms; }
+  .hero h1 .g { animation-delay: 180ms; }
+  .hero .lead { animation-delay: 240ms; }
+  .hero .cta { animation-delay: 300ms; }
   .tape, .tape-note { animation: fade 900ms ease 400ms both; }
   /* o cursor só começa a piscar depois que o título entrou */
   .caret { animation: blink 1.1s steps(1) 1s infinite; }
@@ -224,7 +231,7 @@ pre .cmd::before { content: "$ "; color: var(--green); }
 
 @media (prefers-reduced-motion: reduce) {
   /* menos movimento: nada se desloca; o topo só esmaece, a faixa fica parada e inteira, o cursor fica fixo */
-  .hero .pill, .hero h1, .hero .lead, .hero .cta { animation: fade 300ms ease both; }
+  .hero .mascot, .hero .pill, .hero h1, .hero .lead, .hero .cta { animation: fade 300ms ease both; }
   .tape-group[aria-hidden="true"] { display: none; }
   .tape-track { width: auto; justify-content: center; }
   .tape-group { flex-wrap: wrap; justify-content: center; row-gap: 10px; }
