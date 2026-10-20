@@ -45,7 +45,10 @@ figure { margin: 0; }
 .cta { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
 /* faixa de cotações: números em Poppins (na fonte de pixels o 2 parece 8) */
 .tape { margin-top: 56px; border-block: 1px solid var(--line); background: #06090d; }
-.tape .wrap { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px 36px; padding-block: 14px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+/* faixa: letreiro (duas cópias iguais no trilho; ver "Movimento" no fim do arquivo) */
+.tape { overflow: hidden; }
+.tape-track { display: flex; width: max-content; }
+.tape-group { display: flex; gap: 36px; padding: 14px 18px; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .tape b { color: var(--muted); font-weight: 600; margin-right: 8px; letter-spacing: .04em; }
 .neg { color: var(--red); } .pos { color: var(--green); }
 .tape-note { text-align: center; font-size: 12px; color: var(--muted); margin: 10px 0 0; }
@@ -119,7 +122,6 @@ footer .warn { color: var(--text); }
   .links { display: none; }
   .nav .lang { margin-left: auto; }
   .hero { padding-top: 44px; }
-  .tape .wrap { flex-wrap: nowrap; justify-content: flex-start; overflow-x: auto; }
   .shot .pill { font-size: 10px; right: 8px; top: 8px; }
   .hero .lead { font-size: 16px; }
   section.block { padding-top: 64px; }
@@ -138,3 +140,61 @@ footer .warn { color: var(--text); }
 .social a:focus-visible, .social-mini a:focus-visible { outline: 2px solid var(--amber); outline-offset: 3px; }
 .social-mini { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
 .social-mini a { display: inline-flex; padding: 8px; border: 1px solid var(--line); border-radius: 8px; color: var(--muted); }
+
+/* ------------------------------------------------------------------ Movimento (só CSS, sem JavaScript)
+   Entrada do topo em sequência, cursor de pixel, letreiro de cotações, botões e aparecimento ao rolar.
+   Curvas e durações seguem a skill animate (Emil Kowalski): só transform/opacity, ease-out forte. */
+:root { --ease-out: cubic-bezier(0.23, 1, 0.32, 1); }
+
+@keyframes rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+@keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes blink { 50% { opacity: 0; } }
+@keyframes marquee { to { transform: translateX(-50%); } }
+@keyframes reveal { from { opacity: 0; transform: translateY(18px) scale(.985); } to { opacity: 1; transform: none; } }
+
+/* cursor de pixel depois da segunda linha do título */
+.caret { display: inline-block; width: .42em; height: .78em; margin-left: .12em; vertical-align: -.04em; background: var(--green); }
+
+/* botões: retorno ao toque em qualquer tela; elevação ao passar o mouse só com mouse de verdade */
+.btn { transition: transform 160ms var(--ease-out), background-color 160ms ease, border-color 160ms ease; }
+.btn:active { transform: scale(.97); }
+.card, .addr, .tile { transition: border-color 200ms ease; }
+@media (hover: hover) and (pointer: fine) {
+  .btn:hover { transform: translateY(-1px); }
+  .btn.ghost:hover { border-color: var(--green); }
+  .card:hover, .addr:hover, .tile:hover { border-color: #2f4256; }
+  .tape:hover .tape-track { animation-play-state: paused; }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* entrada em sequência: selo, linha 1, linha 2, texto, botões (60 ms entre cada) */
+  .hero .pill, .hero h1 .l1, .hero h1 .g, .hero .lead, .hero .cta { animation: rise 700ms var(--ease-out) both; }
+  /* span só aceita transform como inline-block */
+  .hero h1 .l1, .hero h1 .g { display: inline-block; }
+  .hero .pill { animation-delay: 0ms; }
+  .hero h1 .l1 { animation-delay: 60ms; }
+  .hero h1 .g { animation-delay: 120ms; }
+  .hero .lead { animation-delay: 180ms; }
+  .hero .cta { animation-delay: 240ms; }
+  .tape, .tape-note { animation: fade 900ms ease 400ms both; }
+  /* o cursor só começa a piscar depois que o título entrou */
+  .caret { animation: blink 1.1s steps(1) 1s infinite; }
+  /* letreiro contínuo e linear; para quando o mouse passa por cima */
+  .tape-track { animation: marquee 48s linear infinite; }
+  /* aparecimento ao rolar, guiado pela própria rolagem (navegador sem suporte mostra tudo direto) */
+  @supports (animation-timeline: view()) {
+    section.block .wrap > *, .cards > *, .grid4 > *, .road > li, .donate > *, .runs > * {
+      animation: reveal linear both;
+      animation-timeline: view();
+      animation-range: entry 0% entry 55%;
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* menos movimento: nada se desloca; o topo só esmaece, a faixa fica parada e inteira, o cursor fica fixo */
+  .hero .pill, .hero h1, .hero .lead, .hero .cta { animation: fade 300ms ease both; }
+  .tape-group[aria-hidden="true"] { display: none; }
+  .tape-track { width: auto; justify-content: center; }
+  .tape-group { flex-wrap: wrap; justify-content: center; row-gap: 10px; }
+}
