@@ -50,13 +50,18 @@ On first run the core creates `~/.openspread/config.json` (or the path in `OPENS
 {
   "exchanges": ["binance", "okx", "bybit", "kraken", "coinbaseexchange"],
   "pairs": ["USDC/USDT", "USDE/USDT", "DAI/USDT", "FDUSD/USDT"],
-  "pollMs": 10000
+  "pollMs": 10000,
+  "alerts": [{ "pair": "USDC/USDT", "abovePct": 0.05 }]
 }
 ```
 
 - `exchanges`: [CCXT ids](https://github.com/ccxt/ccxt#supported-cryptocurrency-exchanges), 2 to 20.
 - `pairs`: up to 20, like `BTC/USDT`. An exchange that does not list a pair just stays out of that room.
 - `pollMs`: 5000 to 300000 (5 s to 5 min).
+- `alerts` (optional): one per pair, "tell me when the best net spread reaches `abovePct` %" (between -1 and 10).
+  Each alert rings once and re-arms only after the spread falls 0.02 points below the level, so it does not flicker.
+  Bullroom shows it as a notice on that pair's room. Idea from
+  [trader-skill](https://github.com/Jakeschincariol/trader-skill)'s alerts (MIT), rewritten here.
 
 Edit it and restart the core. A broken file is reported in the terminal and the defaults are used until it is fixed.
 To see what each exchange lists before saving: `npm run check:exchanges -- BTC/USDT ETH/USDT`.

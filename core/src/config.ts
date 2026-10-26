@@ -3,12 +3,13 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
-import type { ConfigLimits, CoreConfig } from './types';
+import type { ConfigLimits, CoreConfig, SpreadAlert } from './types';
 
 export const DEFAULT_CONFIG: Readonly<CoreConfig> = Object.freeze({
   exchanges: ['binance', 'okx', 'bybit', 'kraken', 'coinbaseexchange'],
   pairs: ['USDC/USDT', 'USDE/USDT', 'DAI/USDT', 'FDUSD/USDT'],
   pollMs: 10_000,
+  alerts: [],
 });
 
 export const LIMITS: Readonly<ConfigLimits> = Object.freeze({
@@ -17,14 +18,18 @@ export const LIMITS: Readonly<ConfigLimits> = Object.freeze({
   maxPairs: 20,
   minPollMs: 5_000,
   maxPollMs: 300_000,
+  maxAlerts: 20,
+  minAlertPct: -1,
+  maxAlertPct: 10,
 });
 
-const FIELDS = new Set(['exchanges', 'pairs', 'pollMs']);
+const FIELDS = new Set(['exchanges', 'pairs', 'pollMs', 'alerts']);
+const ALERT_FIELDS = new Set(['pair', 'abovePct']);
 const PAIR = /^[A-Z0-9]{2,12}\/[A-Z0-9]{2,12}$/;
 
 export type Validation = { ok: true; config: CoreConfig } | { ok: false; errors: string[] };
 
-/** Confere e normaliza (ids em minúsculas, pares em maiúsculas, sem repetição). `pollMs` ausente = padrão. */
+/** Confere e normaliza (ids em minúsculas, pares em maiúsculas, sem repetição). `pollMs` ausente = padrão; `alerts` ausente = nenhum. */
 export function validateConfig(raw: unknown, known: readonly string[]): Validation {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return { ok: false, errors: ['a configuração precisa ser um objeto JSON'] };
   const r = raw as Record<string, unknown>;
@@ -62,7 +67,31 @@ export function validateConfig(raw: unknown, known: readonly string[]): Validati
     } else pollMs = v;
   }
 
-  return errors.length ? { ok: false, errors } : { ok: true, config: { exchanges, pairs, pollMs } };
+  const alerts: SpreadAlert[] = [];
+  if (r.alerts !== undefined) {
+    if (!Array.isArray(r.alerts)) errors.push('"alerts" precisa ser uma lista');
+    else {
+      if (r.alerts.length > LIMITS.maxAlerts) errors.push(`no máximo ${LIMITS.maxAlerts} alertas`);
+      for (const item of r.alerts) {
+        const a = item as Record<string, unknown> | null;
+        if (!a || typeof a !== 'object' || Array.isArray(a)) {
+          errors.push('cada alerta precisa ser um objeto { pair, abovePct }');
+          continue;
+        }
+        const extraA = Object.keys(a).filter((k) => !ALERT_FIELDS.has(k));
+        if (extraA.length) errors.push(`campo desconhecido no alerta: ${extraA.join(', ')}`);
+        const pair = typeof a.pair === 'string' ? a.pair.trim().toUpperCase() : '';
+        const pct = a.abovePct;
+        if (!pairs.includes(pair)) errors.push(`alerta para um par fora da lista: ${pair || '(vazio)'}`);
+        else if (alerts.some((x) => x.pair === pair)) errors.push(`só um alerta por par: ${pair}`);
+        if (typeof pct !== 'number' || !Number.isFinite(pct) || pct < LIMITS.minAlertPct || pct > LIMITS.maxAlertPct) {
+          errors.push(`nível do alerta precisa ser um número entre ${LIMITS.minAlertPct} e ${LIMITS.maxAlertPct} (%)`);
+        } else if (pair) alerts.push({ pair, abovePct: pct });
+      }
+    }
+  }
+
+  return errors.length ? { ok: false, errors } : { ok: true, config: { exchanges, pairs, pollMs, alerts } };
 }
 
 export function configPath(env: NodeJS.ProcessEnv = process.env): string {
@@ -82,7 +111,7 @@ export function saveConfig(file: string, config: CoreConfig): void {
  * padrão, sem sobrescrever (o usuário corrige à mão ou pela tela).
  */
 export function loadConfig(file: string, known: readonly string[], log: (msg: string) => void = () => {}): CoreConfig {
-  const fallback = (): CoreConfig => ({ ...DEFAULT_CONFIG, exchanges: [...DEFAULT_CONFIG.exchanges], pairs: [...DEFAULT_CONFIG.pairs] });
+  const fallback = (): CoreConfig => ({ ...DEFAULT_CONFIG, exchanges: [...DEFAULT_CONFIG.exchanges], pairs: [...DEFAULT_CONFIG.pairs], alerts: [] });
   if (!existsSync(file)) {
     const config = fallback();
     try {

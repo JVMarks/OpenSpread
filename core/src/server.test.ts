@@ -111,7 +111,7 @@ describe('rotas de configuração', () => {
     const base = await start(h);
     const r = await put(base, { exchanges: ['Binance', 'kucoin'], pairs: ['btc/usdt'], pollMs: 20_000 }, { Origin: BULLROOM });
     expect(r.status).toBe(200);
-    expect(saved).toEqual([{ exchanges: ['binance', 'kucoin'], pairs: ['BTC/USDT'], pollMs: 20_000 }]);
+    expect(saved).toEqual([{ exchanges: ['binance', 'kucoin'], pairs: ['BTC/USDT'], pollMs: 20_000, alerts: [] }]);
     expect((await r.json()).config.pairs).toEqual(['BTC/USDT']);
   });
 

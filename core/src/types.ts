@@ -50,6 +50,27 @@ export interface CoreState {
   exchanges: ExchangeStatus[];
   /** Só pares com 2 ou mais corretoras ativas. */
   pairs: PairState[];
+  /** Alertas de spread que tocaram por último (mais antigo primeiro). Ausente em núcleos antigos. */
+  alerts?: AlertEvent[];
+}
+
+/** "Avise quando o spread líquido do par chegar a X%." Toca uma vez; rearma quando o spread recua. */
+export interface SpreadAlert {
+  pair: string;
+  /** Nível em % (0,05 = 0,05%), comparado ao spread líquido do melhor par de corretoras. */
+  abovePct: number;
+}
+
+/** Um alerta que tocou. */
+export interface AlertEvent {
+  /** Único por execução do núcleo. */
+  id: string;
+  pair: string;
+  abovePct: number;
+  netPct: number;
+  buyOn: string;
+  sellOn: string;
+  at: number;
 }
 
 /** O que o núcleo lê e com que frequência (arquivo ~/.openspread/config.json; GET/PUT /v1/config). Sem chaves. */
@@ -60,6 +81,8 @@ export interface CoreConfig {
   pairs: string[];
   /** Intervalo entre leituras, em ms. */
   pollMs: number;
+  /** Alertas de spread, um por par no máximo. */
+  alerts: SpreadAlert[];
 }
 
 export interface ConfigLimits {
@@ -68,6 +91,10 @@ export interface ConfigLimits {
   maxPairs: number;
   minPollMs: number;
   maxPollMs: number;
+  maxAlerts: number;
+  /** Faixa aceita para o nível do alerta, em %. */
+  minAlertPct: number;
+  maxAlertPct: number;
 }
 
 /** Resposta de GET /v1/config. */

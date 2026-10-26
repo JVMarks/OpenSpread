@@ -1,6 +1,7 @@
 // OpenSpread core: lê cotações públicas nas corretoras configuradas e serve em 127.0.0.1:4848.
 // Uso: npm start  (porta: OPENSPREAD_PORT; arquivo de configuração: OPENSPREAD_CONFIG, padrão ~/.openspread/config.json)
 import ccxt from 'ccxt';
+import { SpreadAlerts } from './alerts';
 import { configPath, LIMITS, loadConfig, saveConfig, validateConfig } from './config';
 import { Poller } from './poller';
 import { DEFAULT_PORT, startServer } from './server';
@@ -15,6 +16,7 @@ let config: CoreConfig = loadConfig(file, KNOWN, log);
 log(`lendo ${config.exchanges.length} corretoras e ${config.pairs.length} pares a cada ${config.pollMs / 1000} s (${file})`);
 
 const poller = new Poller(config.exchanges, config.pairs, { log });
+const alerts = new SpreadAlerts();
 const port = Number(process.env.OPENSPREAD_PORT ?? DEFAULT_PORT);
 
 let running = false;
@@ -23,13 +25,17 @@ const tick = async () => {
   running = true;
   try {
     await poller.pollOnce();
+    const s = poller.state();
+    for (const e of alerts.evaluate(config.alerts, s.pairs, s.at)) {
+      log(`alerta: ${e.pair} com spread líquido de ${e.netPct.toFixed(3)}% (nível ${e.abovePct}%), ${e.buyOn} → ${e.sellOn}`);
+    }
   } finally {
     running = false;
   }
 };
 let timer = setInterval(() => void tick(), config.pollMs);
 
-const server = startServer(() => poller.state(), {
+const server = startServer(() => ({ ...poller.state(), alerts: alerts.events() }), {
   port,
   allowOrigins: ORIGINS,
   config: {
@@ -43,7 +49,7 @@ const server = startServer(() => poller.state(), {
       clearInterval(timer);
       timer = setInterval(() => void tick(), next.pollMs);
       void tick();
-      log(`configuração salva: ${next.exchanges.length} corretoras, ${next.pairs.length} pares, a cada ${next.pollMs / 1000} s`);
+      log(`configuração salva: ${next.exchanges.length} corretoras, ${next.pairs.length} pares, ${next.alerts.length} alertas, a cada ${next.pollMs / 1000} s`);
     },
   },
 });

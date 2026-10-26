@@ -16,7 +16,7 @@ afterEach(() => dirs.splice(0).forEach((d) => rmSync(d, { recursive: true, force
 describe('validateConfig', () => {
   it('normaliza: ids em minúsculas, pares em maiúsculas, sem repetição; pollMs ausente = padrão', () => {
     const v = validateConfig({ exchanges: [' Binance', 'okx', 'binance'], pairs: ['btc/usdt', 'BTC/USDT', 'eth/usdt'] }, KNOWN);
-    expect(v).toEqual({ ok: true, config: { exchanges: ['binance', 'okx'], pairs: ['BTC/USDT', 'ETH/USDT'], pollMs: DEFAULT_CONFIG.pollMs } });
+    expect(v).toEqual({ ok: true, config: { exchanges: ['binance', 'okx'], pairs: ['BTC/USDT', 'ETH/USDT'], pollMs: DEFAULT_CONFIG.pollMs, alerts: [] } });
   });
 
   it('recusa corretora desconhecida, par fora do formato e moeda repetida', () => {
@@ -44,6 +44,18 @@ describe('validateConfig', () => {
     expect(validateConfig({ exchanges: ['binance', 'okx'], pairs: many }, KNOWN).ok).toBe(false);
   });
 
+  it('alertas: normaliza o par, um por par, só pares da lista, nível na faixa, sem campo extra', () => {
+    const base = { exchanges: ['binance', 'okx'], pairs: ['BTC/USDT', 'USDC/USDT'] };
+    expect(validateConfig({ ...base, alerts: [{ pair: 'btc/usdt', abovePct: 0.05 }] }, KNOWN)).toMatchObject({ ok: true, config: { alerts: [{ pair: 'BTC/USDT', abovePct: 0.05 }] } });
+    const bad = (alerts: unknown) => (validateConfig({ ...base, alerts }, KNOWN) as { ok: boolean; errors?: string[] });
+    expect(bad([{ pair: 'ETH/USDT', abovePct: 0.1 }]).errors!.join()).toContain('fora da lista');
+    expect(bad([{ pair: 'BTC/USDT', abovePct: 0.1 }, { pair: 'BTC/USDT', abovePct: 0.2 }]).errors!.join()).toContain('um alerta por par');
+    expect(bad([{ pair: 'BTC/USDT', abovePct: 50 }]).ok).toBe(false);
+    expect(bad([{ pair: 'BTC/USDT', abovePct: '0.1' }]).ok).toBe(false);
+    expect(bad([{ pair: 'BTC/USDT', abovePct: 0.1, apiKey: 'x' }]).errors!.join()).toContain('apiKey');
+    expect(bad('x').ok).toBe(false);
+  });
+
   it('recusa o que não é objeto ou lista de textos', () => {
     expect(validateConfig(null, KNOWN).ok).toBe(false);
     expect(validateConfig([], KNOWN).ok).toBe(false);
@@ -69,8 +81,8 @@ describe('arquivo de configuração', () => {
 
   it('salva e lê de volta; não sobra temporário', () => {
     const file = tmp();
-    saveConfig(file, { exchanges: ['binance', 'kucoin'], pairs: ['BTC/USDT'], pollMs: 15_000 });
-    expect(loadConfig(file, KNOWN)).toEqual({ exchanges: ['binance', 'kucoin'], pairs: ['BTC/USDT'], pollMs: 15_000 });
+    saveConfig(file, { exchanges: ['binance', 'kucoin'], pairs: ['BTC/USDT'], pollMs: 15_000, alerts: [{ pair: 'BTC/USDT', abovePct: 0.05 }] });
+    expect(loadConfig(file, KNOWN)).toEqual({ exchanges: ['binance', 'kucoin'], pairs: ['BTC/USDT'], pollMs: 15_000, alerts: [{ pair: 'BTC/USDT', abovePct: 0.05 }] });
     expect(existsSync(`${file}.tmp`)).toBe(false);
   });
 
