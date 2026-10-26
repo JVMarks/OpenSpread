@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self'; font-src 'self'; script-src 'none'; object-src 'none'; base-uri 'self'; form-action 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; media-src 'self'; style-src 'self'; font-src 'self'; script-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'self'; form-action 'none'">
   <meta name="referrer" content="no-referrer">
   <title>OpenSpread + Bullroom: watch the spread, keep the keys</title>
   <meta name="description" content="Open-source, local-first tools for stablecoin spreads and crypto bots. OpenSpread reads the exchanges from your own computer; Bullroom turns your bots into a pixel-art trading floor.">
@@ -22,6 +22,7 @@
   <meta name="twitter:card" content="summary_large_image">
   <link rel="alternate" hreflang="pt-BR" href="pt/">
   <link rel="stylesheet" href="assets/site.css">
+  <script src="assets/site.js" defer></script>
 </head>
 <body>
   <nav class="nav" aria-label="Main">
@@ -29,6 +30,8 @@
       <a class="brand" href="./"><img src="assets/img/mascot-head-64.png" alt="" width="28" height="28">OpenSpread <span class="plus">+</span> <span>Bull<span class="pos">room</span></span></a>
       <div class="links">
         <a href="demo/?mock=trading&amp;speed=5">Demo</a>
+        <a href="#video">Video</a>
+        <a href="#room">The room</a>
         <a href="#tools">Tools</a>
         <a href="#run">Run it</a>
         <a href="#roadmap">Roadmap</a>
@@ -39,63 +42,106 @@
   </nav>
 
   <header class="hero">
-    <div class="wrap">
-      <img class="mascot" src="assets/img/mascot-trader.webp" alt="Bullroom mascot: a golden bull robot trading at a monitor" width="272" height="360">
-      <span class="pill amber">OPEN SOURCE · LOCAL-FIRST</span>
-      <h1><span class="l1">Watch the spread.</span><br><span class="g">Keep the keys.<span class="caret" aria-hidden="true"></span></span></h1>
-      <p class="lead">OpenSpread reads the exchanges from your own computer and shows the real net spread after fees. Bullroom turns your bots into a pixel-art trading floor.</p>
-      <div class="cta">
-        <a class="btn primary" href="demo/?mock=trading&amp;speed=5">▶ Try the demo</a>
-        <a class="btn ghost" href="#run">Get the code</a>
+    <div class="board">
+      <div class="wrap board-top">
+        <p class="board-cap" aria-hidden="true"></p>
+        <div class="board-legend" aria-label="Scoreboard messages"></div>
       </div>
+      <canvas aria-hidden="true"></canvas>
+      <ol class="board-msgs" aria-label="Sample read">
+        <li data-key="SPREAD" data-color="red" data-cap="&lt;b&gt;USDC/USDT&lt;/b&gt; · BEST NET SPREAD AFTER BOTH FEES">−0.20%</li>
+        <li data-key="EXCHANGES" data-color="green" data-cap="&lt;b&gt;BINANCE · OKX · BYBIT · KRAKEN · COINBASE&lt;/b&gt; · READ-ONLY">5 LIVE</li>
+        <li data-key="FEES" data-color="amber" data-cap="&lt;b&gt;EACH SIDE CHARGES&lt;/b&gt; · THE SIGN SUBTRACTS BOTH">FEE+FEE</li>
+        <li data-key="ALERT" data-color="green" data-cap="&lt;b&gt;SPREAD ALERT&lt;/b&gt; · RINGS ONCE AT YOUR LEVEL, RE-ARMS BELOW IT">≥0.05%</li>
+      </ol>
     </div>
-    <div class="tape" aria-label="Sample read">
-      <div class="tape-track">
-        <div class="tape-group">
-          <span><b>USDC/USDT</b><span class="neg">−0.205%</span></span>
-          <span><b>USDE/USDT</b><span class="neg">−0.21%</span></span>
-          <span><b>BINANCE</b><span class="pos">+0.1 bp</span></span>
-          <span><b>OKX</b><span class="pos">+0.2 bp</span></span>
-          <span><b>BYBIT</b><span class="pos">+0.2 bp</span></span>
-          <span><b>KRAKEN</b><span class="pos">+0.2 bp</span></span>
-          <span><b>COINBASE</b><span class="neg">−0.8 bp</span></span>
-        </div>
-        <div class="tape-group" aria-hidden="true">
-          <span><b>USDC/USDT</b><span class="neg">−0.205%</span></span>
-          <span><b>USDE/USDT</b><span class="neg">−0.21%</span></span>
-          <span><b>BINANCE</b><span class="pos">+0.1 bp</span></span>
-          <span><b>OKX</b><span class="pos">+0.2 bp</span></span>
-          <span><b>BYBIT</b><span class="pos">+0.2 bp</span></span>
-          <span><b>KRAKEN</b><span class="pos">+0.2 bp</span></span>
-          <span><b>COINBASE</b><span class="neg">−0.8 bp</span></span>
+    <div class="wrap hero-copy">
+      <div>
+        <span class="pill amber">OPEN SOURCE · LOCAL-FIRST</span>
+        <h1><span class="l1">Watch the spread.</span><br><span class="g">Keep the keys.<span class="caret" aria-hidden="true"></span></span></h1>
+      </div>
+      <div>
+        <p class="lead">OpenSpread reads five exchanges from your own computer and shows the real spread after both fees, even when it is negative. Bullroom turns it into a pixel-art trading floor that rings when the math finally works.</p>
+        <div class="cta">
+          <a class="btn primary" href="demo/?mock=trading&amp;speed=5">▶ Try the demo</a>
+          <a class="btn ghost" href="#video">Watch the 40 s video</a>
         </div>
       </div>
     </div>
-    <p class="tape-note">Read on Oct 18, 2026, 23:37 UTC · pairs: best net spread after both taker fees · exchanges: USDC/USDT price vs. the room average</p>
+    <p class="hero-note">Sample read on Oct 26, 2026 · alert level shown as an example · not a recommendation</p>
   </header>
 
   <main>
-    <section class="block" aria-labelledby="see">
-      <div class="wrap">
-        <div class="kicker">WHAT YOU SEE</div>
-        <h2 id="see">Every exchange is a trader. Every pair is a room.</h2>
-        <p class="sub">Five exchanges, read live and read-only. The sign on each room shows the best spread between them after fees. Today it is negative: the gap is real, and the fees eat it.</p>
-        <figure>
-          <div class="shot">
-            <span class="pill amber">REAL DATA · READ-ONLY</span>
-            <img src="assets/img/live-en-US.webp" alt="Bullroom showing two rooms, USDC/USDT and USDE/USDT, with Binance, OKX, Bybit, Kraken and Coinbase as characters and the best net spread on each room sign" width="1600" height="900" loading="lazy">
+    <section class="block" id="video" aria-labelledby="video-h">
+      <div class="wrap reel">
+        <div class="head">
+          <div class="kicker"><i>02</i> WATCH</div>
+          <h2 id="video-h">40 seconds, one honest number.</h2>
+          <p class="sub">Five exchanges in one room, read live. Why the classic stablecoin arbitrage does not close today, and how the room tells you the day it does.</p>
+        </div>
+        <div class="phone-wrap">
+          <div class="phone">
+            <video src="assets/video/bullroom-reel.mp4" poster="assets/video/bullroom-reel-poster.webp" controls muted loop playsinline preload="metadata" width="720" height="1280" aria-label="Bullroom video, 40 seconds, in Portuguese with English captions">
+              <track kind="captions" srclang="en" label="English" src="assets/video/bullroom-reel.en.vtt" default>
+            </video>
+            <span class="glare" aria-hidden="true"></span>
+            <button class="sound" type="button" data-off="🔇 TAP FOR SOUND" data-on="🔊 SOUND ON" aria-pressed="false">🔇 TAP FOR SOUND</button>
           </div>
-          <figcaption>Bullroom reading OpenSpread on Oct 18, 2026. No API keys, no orders, no server of ours.</figcaption>
+        </div>
+        <div>
+          <ol class="beats">
+            <li><button class="beat" type="button" data-t="0"><span class="k">00:00</span><b>5 exchanges, one room</b><span>Each character is an exchange, live and read-only.</span></button></li>
+            <li><button class="beat" type="button" data-t="11.9"><span class="k">00:12</span><b>Buy low, sell high?</b><span>The classic arbitrage, on dollar stablecoins.</span></button></li>
+            <li><button class="beat" type="button" data-t="16.8"><span class="k">00:17</span><b>Fee + fee</b><span>Each side charges. The sign subtracts both.</span></button></li>
+            <li><button class="beat" type="button" data-t="25.6"><span class="k">00:26</span><b class="neg">−0.20% today</b><span>Negative stays negative. Today it does not pay.</span></button></li>
+            <li><button class="beat" type="button" data-t="30.9"><span class="k">00:31</span><b class="pos">The room rings once</b><span>Set a level; the alert fires when the math works.</span></button></li>
+          </ol>
+          <div class="reel-bar" aria-hidden="true"><i></i></div>
+          <p class="hint">Spoken in Portuguese, captioned in English. Tap a moment to jump to it.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="block" id="room" aria-labelledby="room-h">
+      <div class="wrap">
+        <div class="head">
+          <div class="kicker"><i>03</i> THE ROOM</div>
+          <h2 id="room-h">Every exchange is a trader. Every pair is a room.</h2>
+          <p class="sub">Scroll and the building lands, exactly as Bullroom draws it. The sign on each room shows the best spread between the exchanges after fees. Today it is negative: the gap is real, and the fees eat it.</p>
+        </div>
+        <figure>
+          <div class="building">
+            <div class="scene">
+              <div class="shadow"></div>
+              <div class="slab">
+                <div class="top" role="img" aria-label="Bullroom building seen from above: reception, kitchen, lounge and two trading rooms, USDC/USDT and USDE/USDT, with the exchanges as characters"></div>
+                <div class="side s"></div><div class="side e"></div>
+                <span class="ring" aria-hidden="true"></span>
+                <div class="sign usdc hot" aria-hidden="true"><div class="card">USDC/USDT · 5<b class="neg">−0.20%</b><small>after both taker fees</small></div></div>
+                <div class="sign usde" aria-hidden="true"><div class="card">USDE/USDT · 3<b class="neg">−0.21%</b><small>alert example: ≥ 0.05%</small></div></div>
+                <div class="sign recp" aria-hidden="true"><div class="card">Reception<small> · Bullroom</small></div></div>
+              </div>
+            </div>
+            <img class="mascot" src="assets/img/mascot-trader.webp" alt="" width="272" height="360" loading="lazy">
+          </div>
+          <figcaption>Bullroom reading OpenSpread, live and read-only. No API keys, no orders, no server of ours.</figcaption>
         </figure>
+        <div class="facts">
+          <div data-tilt><b>BUBBLE</b><p>Over each exchange: its price against the room average, in basis points.</p></div>
+          <div data-tilt><b>SIGN</b><p>Over each room: the best spread between any two exchanges, after both taker fees.</p></div>
+          <div data-tilt><b>ALERT</b><p>Pick a level per pair. The room rings once when the spread reaches it, and re-arms below it.</p></div>
+        </div>
       </div>
     </section>
 
     <section class="block" id="tools" aria-labelledby="tools-h">
       <div class="wrap">
-        <div class="kicker">TWO TOOLS</div>
-        <h2 id="tools-h">The engine and the window.</h2>
+        <div class="head">
+          <div class="kicker"><i>04</i> TWO TOOLS</div>
+          <h2 id="tools-h">The engine and the window.</h2>
+        </div>
         <div class="cards">
-          <article class="card">
+          <article class="card" data-tilt>
             <img src="assets/img/sign.webp" alt="Bullroom reception sign in scoreboard style" width="900" height="420" loading="lazy">
             <div class="body">
               <h3>OpenSpread</h3>
@@ -103,13 +149,14 @@
               <ul>
                 <li>Reads public prices from Binance, OKX, Bybit, Kraken and Coinbase.</li>
                 <li>Shows the net spread after both taker fees. Negative stays negative.</li>
-                <li>Serves it locally on <code>127.0.0.1</code>. Nothing leaves your machine.</li>
-                <li>Next: paper trading, your own Claude or Codex designing strategies, orders behind a risk policy.</li>
+                <li><span class="pill amber">NEW</span>Your exchanges and pairs in one local file, <code>~/.openspread/config.json</code>.</li>
+                <li><span class="pill amber">NEW</span>Spread alerts that ring once and re-arm, so they do not flicker.</li>
+                <li>Serves it on <code>127.0.0.1</code>. Nothing leaves your machine.</li>
               </ul>
               <div class="actions"><a class="btn ghost" href="https://github.com/JVMarks/OpenSpread">OpenSpread on GitHub</a></div>
             </div>
           </article>
-          <article class="card">
+          <article class="card" data-tilt>
             <img src="assets/img/sim-en-US.webp" alt="Bullroom simulated trading floor with bots at desks, PnL over their heads and a trade feed" width="1600" height="900" loading="lazy">
             <div class="body">
               <h3>Bull<span class="pos">room</span></h3>
@@ -117,6 +164,7 @@
               <ul>
                 <li>Seated means in a position; walking around means flat.</li>
                 <li>PnL floats over each head; the room sign sums the room.</li>
+                <li><span class="pill amber">NEW</span>Markets panel: choose exchanges and pairs, and set alerts, from the room.</li>
                 <li>A bot that hits its daily loss limit is ejected from the room.</li>
                 <li>Simulated in the browser, or live with OpenSpread.</li>
               </ul>
@@ -132,12 +180,14 @@
 
     <section class="block" id="run" aria-labelledby="run-h">
       <div class="wrap">
-        <div class="kicker">RUN IT</div>
-        <h2 id="run-h">Two repositories. Node 22.12 or newer.</h2>
+        <div class="head">
+          <div class="kicker"><i>05</i> RUN IT</div>
+          <h2 id="run-h">Two repositories. Node 22.12 or newer.</h2>
+        </div>
         <div class="runs">
           <div>
             <h3>1. OpenSpread (live prices)</h3>
-<pre><span class="ln cmd">git clone https://github.com/JVMarks/OpenSpread.git</span>
+<pre data-copy data-copy-label="COPY" data-copied-label="COPIED"><span class="ln cmd">git clone https://github.com/JVMarks/OpenSpread.git</span>
 <span class="ln cmd">cd OpenSpread/core</span>
 <span class="ln cmd">npm install</span>
 <span class="ln cmd">npm start</span>
@@ -145,38 +195,44 @@
           </div>
           <div>
             <h3>2. Bullroom (the window)</h3>
-<pre><span class="ln cmd">git clone https://github.com/JVMarks/bullroom.git</span>
+<pre data-copy data-copy-label="COPY" data-copied-label="COPIED"><span class="ln cmd">git clone https://github.com/JVMarks/bullroom.git</span>
 <span class="ln cmd">cd bullroom</span>
 <span class="ln cmd">npm install</span>
 <span class="ln cmd">npm run dev:client</span>
 <span class="ln c"># open http://localhost:5173/?source=core<span class="caret" aria-hidden="true"></span></span></pre>
           </div>
         </div>
-        <p class="hint">Only Bullroom? Open <code>?mock=trading</code> for simulated bots, no exchange needed. Installers for Windows and Linux are on the roadmap.</p>
+        <p class="hint">Choose exchanges, pairs and alerts in Bullroom (click the LIVE badge, or Settings › Markets), or edit <code>~/.openspread/config.json</code>. Only Bullroom? Open <code>?mock=trading</code> for simulated bots, no exchange needed.</p>
       </div>
     </section>
 
     <section class="block" aria-labelledby="rules">
       <div class="wrap">
-        <div class="kicker">PRINCIPLES</div>
-        <h2 id="rules">What does not change.</h2>
+        <div class="head">
+          <div class="kicker"><i>06</i> PRINCIPLES</div>
+          <h2 id="rules">What does not change.</h2>
+        </div>
         <div class="grid4">
-          <div class="tile"><b>Local-first</b><p>No server of ours, no cookies, no tracking. It runs on your computer.</p></div>
-          <div class="tile"><b>Your keys stay home</b><p>When keys arrive, they stay on your machine, never with withdrawal permission.</p></div>
-          <div class="tile"><b>The AI proposes</b><p>The engine executes, inside a risk policy you set. The AI never sends an order.</p></div>
-          <div class="tile"><b>Honest numbers</b><p>Losses are shown. Simulated is always labeled. Negative stays negative.</p></div>
+          <div class="tile" data-tilt><span class="n">01</span><b>Local-first</b><p>No server of ours, no cookies, no tracking. It runs on your computer.</p></div>
+          <div class="tile" data-tilt><span class="n">02</span><b>Your keys stay home</b><p>When keys arrive, they stay on your machine, never with withdrawal permission.</p></div>
+          <div class="tile" data-tilt><span class="n">03</span><b>The AI proposes</b><p>The engine executes, inside a risk policy you set. The AI never sends an order.</p></div>
+          <div class="tile" data-tilt><span class="n">04</span><b>Honest numbers</b><p>Losses are shown. Simulated is always labeled. Negative stays negative.</p></div>
         </div>
       </div>
     </section>
 
     <section class="block" id="roadmap" aria-labelledby="road-h">
       <div class="wrap">
-        <div class="kicker">ROADMAP</div>
-        <h2 id="road-h">Built in stages, in the open.</h2>
+        <div class="head">
+          <div class="kicker"><i>07</i> ROADMAP</div>
+          <h2 id="road-h">Built in stages, in the open.</h2>
+        </div>
         <ol class="road">
           <li><span class="st done">DONE</span><span>Bullroom: simulated bots, PnL over heads, room signs, bot card with 5m/1h/24h.</span></li>
           <li><span class="st done">DONE</span><span>OpenSpread core: live, read-only net spreads from five exchanges.</span></li>
-          <li><span class="st next">NEXT</span><span>Economic calendar and alerts in the room; machine room (API limits, latency).</span></li>
+          <li><span class="st done">DONE</span><span>Configurable exchanges and pairs, with the Markets panel in Bullroom.</span></li>
+          <li><span class="st done">DONE</span><span>Spread alerts that ring once and re-arm.</span></li>
+          <li><span class="st next">NEXT</span><span>Economic calendar and radar in the room; machine room (API limits, latency).</span></li>
           <li><span class="st later">LATER</span><span>Paper trading and backtests with Hummingbot.</span></li>
           <li><span class="st later">LATER</span><span>MCP: your own Claude or Codex designing and testing strategies.</span></li>
           <li><span class="st later">LATER</span><span>Real orders behind a risk policy; Nostr for identity and signed analyses.</span></li>
@@ -184,7 +240,7 @@
       </div>
     </section>
 
-    <section class="block" aria-labelledby="support-h">
+    <section class="block" id="support" aria-labelledby="support-h">
       <div class="wrap">
         <div class="support">
           <img class="mascot-peek" src="assets/img/mascot-bust.webp" alt="" width="204" height="240" loading="lazy">
@@ -198,13 +254,13 @@
           </div>
         </div>
         <div class="donate">
-          <div class="addr">
+          <div class="addr" data-copy="sickfog79@walletofsatoshi.com" data-copy-label="COPY" data-copied-label="COPIED">
             <span class="pill amber">LIGHTNING</span>
             <code class="sel">sickfog79@walletofsatoshi.com</code>
             <a class="btn primary" href="lightning:sickfog79@walletofsatoshi.com">⚡ Open in wallet</a>
             <p>Instant and cheap. Any amount.</p>
           </div>
-          <div class="addr">
+          <div class="addr" data-copy="bc1qwk9qmeqm3fwc5q29yu945z0tuvn2yqwvf3wt9cayt5s886lcuhssejj98j" data-copy-label="COPY" data-copied-label="COPIED">
             <span class="pill amber">BITCOIN ON-CHAIN</span>
             <code class="sel">bc1qwk9qmeqm3fwc5q29yu945z0tuvn2yqwvf3wt9cayt5s886lcuhssejj98j</code>
             <a class="btn ghost" href="bitcoin:bc1qwk9qmeqm3fwc5q29yu945z0tuvn2yqwvf3wt9cayt5s886lcuhssejj98j">₿ Open in wallet</a>
