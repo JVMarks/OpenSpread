@@ -16,7 +16,7 @@ afterEach(() => dirs.splice(0).forEach((d) => rmSync(d, { recursive: true, force
 describe('validateConfig', () => {
   it('normaliza: ids em minúsculas, pares em maiúsculas, sem repetição; pollMs ausente = padrão', () => {
     const v = validateConfig({ exchanges: [' Binance', 'okx', 'binance'], pairs: ['btc/usdt', 'BTC/USDT', 'eth/usdt'] }, KNOWN);
-    expect(v).toEqual({ ok: true, config: { exchanges: ['binance', 'okx'], pairs: ['BTC/USDT', 'ETH/USDT'], pollMs: DEFAULT_CONFIG.pollMs, alerts: [] } });
+    expect(v).toEqual({ ok: true, config: { exchanges: ['binance', 'okx'], pairs: ['BTC/USDT', 'ETH/USDT'], pollMs: DEFAULT_CONFIG.pollMs, alerts: [], transfer: { sizeUsd: 1000, withdrawFees: {} } } });
   });
 
   it('recusa corretora desconhecida, par fora do formato e moeda repetida', () => {
@@ -56,6 +56,19 @@ describe('validateConfig', () => {
     expect(bad('x').ok).toBe(false);
   });
 
+  it('transferência: tamanho e taxas por corretora e moeda, normalizados; inválidos recusados', () => {
+    const base = { exchanges: ['binance', 'okx'], pairs: ['USDC/USDT'] };
+    const ok = validateConfig({ ...base, transfer: { sizeUsd: 500, withdrawFees: { Binance: { usdc: 1 }, okx: { USDC: 0.5 } } } }, KNOWN);
+    expect(ok).toMatchObject({ ok: true, config: { transfer: { sizeUsd: 500, withdrawFees: { binance: { USDC: 1 }, okx: { USDC: 0.5 } } } } });
+    expect(validateConfig(base, KNOWN)).toMatchObject({ ok: true, config: { transfer: { sizeUsd: 1000, withdrawFees: {} } } });
+    const bad = (transfer: unknown) => (validateConfig({ ...base, transfer }, KNOWN) as { ok: boolean; errors?: string[] });
+    expect(bad({ sizeUsd: 5 }).ok).toBe(false);
+    expect(bad({ withdrawFees: { fakex: { USDC: 1 } } }).errors!.join()).toContain('fakex');
+    expect(bad({ withdrawFees: { binance: { USDC: -1 } } }).ok).toBe(false);
+    expect(bad({ withdrawFees: { binance: { USDC: '1' } } }).ok).toBe(false);
+    expect(bad({ sizeUsd: 1000, apiKey: 'x' }).errors!.join()).toContain('apiKey');
+  });
+
   it('recusa o que não é objeto ou lista de textos', () => {
     expect(validateConfig(null, KNOWN).ok).toBe(false);
     expect(validateConfig([], KNOWN).ok).toBe(false);
@@ -81,8 +94,8 @@ describe('arquivo de configuração', () => {
 
   it('salva e lê de volta; não sobra temporário', () => {
     const file = tmp();
-    saveConfig(file, { exchanges: ['binance', 'kucoin'], pairs: ['BTC/USDT'], pollMs: 15_000, alerts: [{ pair: 'BTC/USDT', abovePct: 0.05 }] });
-    expect(loadConfig(file, KNOWN)).toEqual({ exchanges: ['binance', 'kucoin'], pairs: ['BTC/USDT'], pollMs: 15_000, alerts: [{ pair: 'BTC/USDT', abovePct: 0.05 }] });
+    saveConfig(file, { exchanges: ['binance', 'kucoin'], pairs: ['BTC/USDT'], pollMs: 15_000, alerts: [{ pair: 'BTC/USDT', abovePct: 0.05 }], transfer: { sizeUsd: 1000, withdrawFees: {} } });
+    expect(loadConfig(file, KNOWN)).toEqual({ exchanges: ['binance', 'kucoin'], pairs: ['BTC/USDT'], pollMs: 15_000, alerts: [{ pair: 'BTC/USDT', abovePct: 0.05 }], transfer: { sizeUsd: 1000, withdrawFees: {} } });
     expect(existsSync(`${file}.tmp`)).toBe(false);
   });
 

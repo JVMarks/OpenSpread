@@ -3,13 +3,14 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
-import type { ConfigLimits, CoreConfig, SpreadAlert } from './types';
+import type { ConfigLimits, CoreConfig, SpreadAlert, TransferConfig } from './types';
 
 export const DEFAULT_CONFIG: Readonly<CoreConfig> = Object.freeze({
   exchanges: ['binance', 'okx', 'bybit', 'kraken', 'coinbaseexchange'],
   pairs: ['USDC/USDT', 'USDE/USDT', 'DAI/USDT', 'FDUSD/USDT'],
   pollMs: 10_000,
   alerts: [],
+  transfer: { sizeUsd: 1_000, withdrawFees: {} },
 });
 
 export const LIMITS: Readonly<ConfigLimits> = Object.freeze({
@@ -21,9 +22,16 @@ export const LIMITS: Readonly<ConfigLimits> = Object.freeze({
   maxAlerts: 20,
   minAlertPct: -1,
   maxAlertPct: 10,
+  minSizeUsd: 10,
+  maxSizeUsd: 10_000_000,
 });
 
-const FIELDS = new Set(['exchanges', 'pairs', 'pollMs', 'alerts']);
+const MAX_FEE = 1_000_000;
+const MAX_FEE_ENTRIES = 200;
+const ASSET = /^[A-Z0-9]{2,12}$/;
+
+const FIELDS = new Set(['exchanges', 'pairs', 'pollMs', 'alerts', 'transfer']);
+const TRANSFER_FIELDS = new Set(['sizeUsd', 'withdrawFees']);
 const ALERT_FIELDS = new Set(['pair', 'abovePct']);
 const PAIR = /^[A-Z0-9]{2,12}\/[A-Z0-9]{2,12}$/;
 
@@ -91,7 +99,56 @@ export function validateConfig(raw: unknown, known: readonly string[]): Validati
     }
   }
 
-  return errors.length ? { ok: false, errors } : { ok: true, config: { exchanges, pairs, pollMs, alerts } };
+  const transfer = validateTransfer(r.transfer, known, errors);
+
+  return errors.length ? { ok: false, errors } : { ok: true, config: { exchanges, pairs, pollMs, alerts, transfer } };
+}
+
+/** `transfer` ausente = padrão (US$ 1.000, nenhuma taxa). Corretora precisa existir na CCXT; moeda em maiúsculas. */
+function validateTransfer(raw: unknown, known: readonly string[], errors: string[]): TransferConfig {
+  const out: TransferConfig = { sizeUsd: DEFAULT_CONFIG.transfer.sizeUsd, withdrawFees: {} };
+  if (raw === undefined) return out;
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    errors.push('"transfer" precisa ser um objeto { sizeUsd, withdrawFees }');
+    return out;
+  }
+  const t = raw as Record<string, unknown>;
+  const extra = Object.keys(t).filter((k) => !TRANSFER_FIELDS.has(k));
+  if (extra.length) errors.push(`campo desconhecido em transfer: ${extra.join(', ')}`);
+  if (t.sizeUsd !== undefined) {
+    const v = t.sizeUsd;
+    if (typeof v !== 'number' || !Number.isFinite(v) || v < LIMITS.minSizeUsd || v > LIMITS.maxSizeUsd) {
+      errors.push(`"transfer.sizeUsd" precisa ser um número entre ${LIMITS.minSizeUsd} e ${LIMITS.maxSizeUsd}`);
+    } else out.sizeUsd = v;
+  }
+  if (t.withdrawFees !== undefined) {
+    const fees = t.withdrawFees;
+    if (!fees || typeof fees !== 'object' || Array.isArray(fees)) {
+      errors.push('"transfer.withdrawFees" precisa ser { corretora: { moeda: taxa } }');
+      return out;
+    }
+    const knownSet = new Set(known);
+    let count = 0;
+    for (const [rawId, assets] of Object.entries(fees as Record<string, unknown>)) {
+      const id = rawId.trim().toLowerCase();
+      if (!knownSet.has(id)) errors.push(`corretora desconhecida na CCXT em transfer: ${rawId}`);
+      if (!assets || typeof assets !== 'object' || Array.isArray(assets)) {
+        errors.push(`taxas de ${rawId} precisam ser { moeda: taxa }`);
+        continue;
+      }
+      for (const [rawAsset, fee] of Object.entries(assets as Record<string, unknown>)) {
+        const asset = rawAsset.trim().toUpperCase();
+        if (!ASSET.test(asset)) errors.push(`moeda inválida em transfer: ${rawAsset}`);
+        else if (typeof fee !== 'number' || !Number.isFinite(fee) || fee < 0 || fee > MAX_FEE) errors.push(`taxa de saque inválida para ${rawId} ${rawAsset}: use um número entre 0 e ${MAX_FEE}`);
+        else {
+          (out.withdrawFees[id] ??= {})[asset] = fee;
+          count++;
+        }
+      }
+    }
+    if (count > MAX_FEE_ENTRIES) errors.push(`no máximo ${MAX_FEE_ENTRIES} taxas de saque`);
+  }
+  return out;
 }
 
 export function configPath(env: NodeJS.ProcessEnv = process.env): string {
@@ -111,7 +168,7 @@ export function saveConfig(file: string, config: CoreConfig): void {
  * padrão, sem sobrescrever (o usuário corrige à mão ou pela tela).
  */
 export function loadConfig(file: string, known: readonly string[], log: (msg: string) => void = () => {}): CoreConfig {
-  const fallback = (): CoreConfig => ({ ...DEFAULT_CONFIG, exchanges: [...DEFAULT_CONFIG.exchanges], pairs: [...DEFAULT_CONFIG.pairs], alerts: [] });
+  const fallback = (): CoreConfig => ({ ...DEFAULT_CONFIG, exchanges: [...DEFAULT_CONFIG.exchanges], pairs: [...DEFAULT_CONFIG.pairs], alerts: [], transfer: { sizeUsd: DEFAULT_CONFIG.transfer.sizeUsd, withdrawFees: {} } });
   if (!existsSync(file)) {
     const config = fallback();
     try {

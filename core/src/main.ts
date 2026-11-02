@@ -2,10 +2,11 @@
 // Uso: npm start  (porta: OPENSPREAD_PORT; arquivo de configuração: OPENSPREAD_CONFIG, padrão ~/.openspread/config.json)
 import ccxt from 'ccxt';
 import { SpreadAlerts } from './alerts';
+import { applyTransfer } from './transfer';
 import { configPath, LIMITS, loadConfig, saveConfig, validateConfig } from './config';
 import { Poller } from './poller';
 import { DEFAULT_PORT, startServer } from './server';
-import type { CoreConfig } from './types';
+import type { CoreConfig, CoreState } from './types';
 
 const ORIGINS = ['http://localhost:5173', 'http://127.0.0.1:5173', 'http://localhost:4747', 'http://127.0.0.1:4747'];
 const KNOWN: readonly string[] = ccxt.exchanges;
@@ -17,6 +18,11 @@ log(`lendo ${config.exchanges.length} corretoras e ${config.pairs.length} pares 
 
 const poller = new Poller(config.exchanges, config.pairs, { log });
 const alerts = new SpreadAlerts();
+/** Estado servido: o do Poller com o custo de transferência da configuração em cada melhor spread. */
+const current = (): CoreState => {
+  const s = poller.state();
+  return { ...s, pairs: applyTransfer(s.pairs, config.transfer) };
+};
 const port = Number(process.env.OPENSPREAD_PORT ?? DEFAULT_PORT);
 
 let running = false;
@@ -25,7 +31,7 @@ const tick = async () => {
   running = true;
   try {
     await poller.pollOnce();
-    const s = poller.state();
+    const s = current();
     for (const e of alerts.evaluate(config.alerts, s.pairs, s.at)) {
       log(`alerta: ${e.pair} com spread líquido de ${e.netPct.toFixed(3)}% (nível ${e.abovePct}%), ${e.buyOn} → ${e.sellOn}`);
     }
@@ -35,7 +41,7 @@ const tick = async () => {
 };
 let timer = setInterval(() => void tick(), config.pollMs);
 
-const server = startServer(() => ({ ...poller.state(), alerts: alerts.events() }), {
+const server = startServer(() => ({ ...current(), alerts: alerts.events() }), {
   port,
   allowOrigins: ORIGINS,
   config: {

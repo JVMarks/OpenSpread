@@ -26,6 +26,29 @@ export interface SpreadOpportunity {
   grossPct: number;
   /** Bruto menos a taxa taker da compra e a da venda, em %. Sem custo de transferência. */
   netPct: number;
+  /** Custo de sacar a moeda-base da corretora de compra (presente quando o núcleo tem a configuração de transferência). */
+  transfer?: TransferCost;
+}
+
+/** Saque da moeda-base de `from` (onde se compra) para a corretora de venda, sobre um tamanho de operação. */
+export interface TransferCost {
+  asset: string;
+  from: string;
+  /** Taxa de saque informada pelo usuário (quantidade da moeda); null = não informada. */
+  fee: number | null;
+  sizeUsd: number;
+  /** Custo do saque em % do tamanho; null quando não dá para estimar. */
+  costPct: number | null;
+  /** Líquido já com o saque, em %; null quando não dá para estimar. */
+  netPct: number | null;
+  /** Por que não deu para estimar: taxa não informada ou cotação que não é estável. */
+  missing?: 'fee' | 'quote';
+}
+
+/** Tamanho da operação e taxas de saque informadas: { corretora: { moeda: quantidade } }. */
+export interface TransferConfig {
+  sizeUsd: number;
+  withdrawFees: Record<string, Record<string, number>>;
 }
 
 export interface ExchangeStatus {
@@ -83,6 +106,8 @@ export interface CoreConfig {
   pollMs: number;
   /** Alertas de spread, um por par no máximo. */
   alerts: SpreadAlert[];
+  /** Custo de transferência (saque) para o líquido "com transferência". */
+  transfer: TransferConfig;
 }
 
 export interface ConfigLimits {
@@ -95,6 +120,8 @@ export interface ConfigLimits {
   /** Faixa aceita para o nível do alerta, em %. */
   minAlertPct: number;
   maxAlertPct: number;
+  minSizeUsd: number;
+  maxSizeUsd: number;
 }
 
 /** Resposta de GET /v1/config. */
