@@ -51,7 +51,8 @@ On first run the core creates `~/.openspread/config.json` (or the path in `OPENS
   "exchanges": ["binance", "okx", "bybit", "kraken", "coinbaseexchange"],
   "pairs": ["USDC/USDT", "USDE/USDT", "DAI/USDT", "FDUSD/USDT"],
   "pollMs": 10000,
-  "alerts": [{ "pair": "USDC/USDT", "abovePct": 0.05 }]
+  "alerts": [{ "pair": "USDC/USDT", "abovePct": 0.05 }],
+  "transfer": { "sizeUsd": 1000, "withdrawFees": { "binance": { "USDC": 1 } } }
 }
 ```
 
@@ -62,6 +63,13 @@ On first run the core creates `~/.openspread/config.json` (or the path in `OPENS
   Each alert rings once and re-arms only after the spread falls 0.02 points below the level, so it does not flicker.
   Bullroom shows it as a notice on that pair's room. Idea from
   [trader-skill](https://github.com/Jakeschincariol/trader-skill)'s alerts (MIT), rewritten here.
+- `transfer` (optional): the arbitrage buys the base coin on one exchange and has to withdraw it to the other. Give the
+  trade size in US$ (10 to 10,000,000) and each exchange's withdrawal fee per coin, in units of that coin (the
+  example values above are illustrative, not real fees). None of the five default exchanges publishes withdrawal
+  fees without an API key, so copy them from each exchange's withdrawal fee page. Where the fee is known, the best
+  spread also carries the net after the withdrawal, and Bullroom and the alerts use that number; where it is not,
+  it says "not set". Not included: the transfer time (the price moves meanwhile) and moving the money back.
+  The values can also be edited in Bullroom's Markets panel.
 
 Edit it and restart the core. A broken file is reported in the terminal and the defaults are used until it is fixed.
 To see what each exchange lists before saving: `npm run check:exchanges -- BTC/USDT ETH/USDT`.
