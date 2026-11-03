@@ -82,6 +82,8 @@ export interface CoreState {
   pairs: PairState[];
   /** Alertas de spread que tocaram por último (mais antigo primeiro). Ausente em núcleos antigos. */
   alerts?: AlertEvent[];
+  /** Carteiras on-chain acompanhadas (resultado, operações, ranking). Ausente em núcleos antigos. */
+  wallets?: WalletsState;
 }
 
 /** "Avise quando o spread líquido do par chegar a X%." Toca uma vez; rearma quando o spread recua. */
@@ -115,6 +117,10 @@ export interface CoreConfig {
   alerts: SpreadAlert[];
   /** Custo de transferência (saque) para o líquido "com transferência". */
   transfer: TransferConfig;
+  /** Carteiras públicas on-chain acompanhadas (lista do usuário). Ausente em núcleos antigos = nenhuma. */
+  wallets?: WalletRef[];
+  /** Descoberta de carteiras pelos top traders de tokens escolhidos (precisa da chave do Birdeye). */
+  discovery?: DiscoveryConfig;
 }
 
 export interface ConfigLimits {
@@ -129,6 +135,9 @@ export interface ConfigLimits {
   maxAlertPct: number;
   minSizeUsd: number;
   maxSizeUsd: number;
+  maxWallets?: number;
+  maxDiscoveryTokens?: number;
+  maxPerToken?: number;
 }
 
 /** Resposta de GET /v1/config. */
@@ -137,6 +146,8 @@ export interface ConfigInfo {
   limits: ConfigLimits;
   /** Todas as corretoras que a CCXT instalada conhece. */
   known: string[];
+  /** Quais chaves de dados existem na máquina (só se existem; o valor nunca sai do núcleo). */
+  keys?: { birdeye: boolean; blockscout: boolean };
 }
 
 /** Um par numa corretora, na conferência (POST /v1/check). */
@@ -161,4 +172,114 @@ export interface CheckExchange {
 export interface CheckResult {
   at: number;
   exchanges: CheckExchange[];
+}
+
+// --- Carteiras on-chain: só dados públicos, só leitura. Nada de aviso de "comprou", nada de copiar. ---
+
+export type WalletChain = 'solana' | 'ethereum' | 'base' | 'bitcoin';
+
+/** Uma carteira acompanhada: só a rede e o endereço (nunca nome de pessoa). */
+export interface WalletRef {
+  chain: WalletChain;
+  /** Solana em base58; EVM em minúsculas; Bitcoin como na rede (bech32 em minúsculas). */
+  address: string;
+}
+
+/** Tokens cujos top traders entram como carteiras "descoberta · Birdeye", separadas da lista do usuário. */
+export interface DiscoveryConfig {
+  tokens: Array<{ chain: Exclude<WalletChain, 'bitcoin'>; address: string }>;
+  /** Quantas carteiras por token (as de maior volume no período do Birdeye). */
+  perToken: number;
+}
+
+/**
+ * buy/sell = troca de um token pela moeda de cotação (SOL, ETH ou USD em stablecoin); in/out = só entrou ou só saiu;
+ * unclassified = mexeu em mais de uma coisa e não deu para dizer o que foi (fica na lista, não some).
+ */
+export type WalletOpKind = 'buy' | 'sell' | 'in' | 'out' | 'unclassified';
+
+/** Uma operação normalizada de uma carteira. */
+export interface WalletOp {
+  /** Hash ou assinatura da transação. */
+  tx: string;
+  /** Epoch ms do bloco. */
+  at: number;
+  kind: WalletOpKind;
+  /** Símbolo curto do ativo (ou o endereço do token encurtado); null em unclassified. */
+  asset: string | null;
+  /** Endereço do token (mint ou contrato); null na moeda da rede. */
+  assetId: string | null;
+  /** Quantidade do ativo (positiva). */
+  amount: number | null;
+  /** Moeda de cotação: 'SOL', 'ETH' ou 'USD' (USDC, USDT e DAI juntos); null fora de compra e venda. */
+  quote: string | null;
+  /** Quanto da cotação saiu (compra) ou entrou (venda), já com a taxa da rede. */
+  quoteAmount: number | null;
+  /** Resultado realizado desta venda (FIFO, na moeda de cotação); ausente quando não fecha compra conhecida. */
+  pnl?: number;
+  /** Link público no explorador da rede. */
+  url: string;
+}
+
+/** Resultado realizado no período numa moeda de cotação. */
+export interface WalletResult {
+  quote: string;
+  amount: number;
+}
+
+export interface WalletState {
+  chain: WalletChain;
+  address: string;
+  /** Lista do usuário ou descoberta pelos top traders. */
+  source: 'curated' | 'birdeye';
+  ok: boolean;
+  error?: string;
+  /** Epoch ms da última leitura com sucesso. */
+  lastAt?: number;
+  /** Hora da operação mais antiga lida (o período pode começar antes dela). */
+  since: number | null;
+  /** Resultado realizado no período, por moeda de cotação. */
+  results: WalletResult[];
+  /** Vendas no período que fecharam compra conhecida; acertos (resultado > 0) e erros (< 0) entre elas. */
+  trades: number;
+  wins: number;
+  losses: number;
+  /** Tem compra ainda não vendida (posição aberta). */
+  open: boolean;
+  /** Saldo na moeda da rede quando a fonte dá de graça (Bitcoin). */
+  balance?: { asset: string; amount: number };
+  /** Últimas operações (mais nova primeiro). */
+  ops: WalletOp[];
+  /** O número do próprio Birdeye ao lado do nosso (só na descoberta). */
+  external?: { source: 'birdeye'; token: string; volumeUsd?: number; trades?: number; pnlUsd?: number };
+  /** Link da carteira no explorador. */
+  url: string;
+}
+
+/** Melhores e piores de uma rede numa moeda de cotação (endereços; só quem fechou operação no período). */
+export interface WalletRanking {
+  chain: WalletChain;
+  quote: string;
+  best: string[];
+  worst: string[];
+}
+
+/** Situação da leitura de uma rede. */
+export interface WalletSource {
+  chain: WalletChain;
+  /** De onde vêm os dados (ex.: "api.mainnet-beta.solana.com"). */
+  source: string;
+  ok: boolean;
+  error?: string;
+  /** Esperando por limite de taxa até este epoch ms. */
+  backoffUntil?: number;
+}
+
+export interface WalletsState {
+  at: number;
+  /** Período do resultado, em ms (fixo). */
+  periodMs: number;
+  wallets: WalletState[];
+  ranking: WalletRanking[];
+  sources: WalletSource[];
 }

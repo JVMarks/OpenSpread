@@ -3,7 +3,8 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
-import type { ConfigLimits, CoreConfig, SpreadAlert, TransferConfig } from './types';
+import { normalizeAddress } from './wallets/address';
+import type { ConfigLimits, CoreConfig, DiscoveryConfig, SpreadAlert, TransferConfig, WalletChain, WalletRef } from './types';
 
 export const DEFAULT_CONFIG: Readonly<CoreConfig> = Object.freeze({
   exchanges: ['binance', 'okx', 'bybit', 'kraken', 'coinbaseexchange'],
@@ -11,6 +12,7 @@ export const DEFAULT_CONFIG: Readonly<CoreConfig> = Object.freeze({
   pollMs: 10_000,
   alerts: [],
   transfer: { sizeUsd: 1_000, withdrawFees: {} },
+  wallets: [],
 });
 
 export const LIMITS: Readonly<ConfigLimits> = Object.freeze({
@@ -24,13 +26,19 @@ export const LIMITS: Readonly<ConfigLimits> = Object.freeze({
   maxAlertPct: 10,
   minSizeUsd: 10,
   maxSizeUsd: 10_000_000,
+  maxWallets: 30,
+  maxDiscoveryTokens: 5,
+  maxPerToken: 10,
 });
 
 const MAX_FEE = 1_000_000;
 const MAX_FEE_ENTRIES = 200;
 const ASSET = /^[A-Z0-9]{2,12}$/;
 
-const FIELDS = new Set(['exchanges', 'pairs', 'pollMs', 'alerts', 'transfer']);
+const FIELDS = new Set(['exchanges', 'pairs', 'pollMs', 'alerts', 'transfer', 'wallets', 'discovery']);
+const WALLET_FIELDS = new Set(['chain', 'address']);
+const DISCOVERY_FIELDS = new Set(['tokens', 'perToken']);
+const CHAINS: readonly WalletChain[] = ['solana', 'ethereum', 'base', 'bitcoin'];
 const TRANSFER_FIELDS = new Set(['sizeUsd', 'withdrawFees']);
 const ALERT_FIELDS = new Set(['pair', 'abovePct']);
 const PAIR = /^[A-Z0-9]{2,12}\/[A-Z0-9]{2,12}$/;
@@ -100,8 +108,10 @@ export function validateConfig(raw: unknown, known: readonly string[]): Validati
   }
 
   const transfer = validateTransfer(r.transfer, known, errors);
+  const wallets = validateWallets(r.wallets, errors);
+  const discovery = validateDiscovery(r.discovery, errors);
 
-  return errors.length ? { ok: false, errors } : { ok: true, config: { exchanges, pairs, pollMs, alerts, transfer } };
+  return errors.length ? { ok: false, errors } : { ok: true, config: { exchanges, pairs, pollMs, alerts, transfer, wallets, ...(discovery ? { discovery } : {}) } };
 }
 
 /** `transfer` ausente = padrão (US$ 1.000, nenhuma taxa). Corretora precisa existir na CCXT; moeda em maiúsculas. */
@@ -151,6 +161,78 @@ function validateTransfer(raw: unknown, known: readonly string[], errors: string
   return out;
 }
 
+/** `wallets` ausente = nenhuma. Endereço conferido pelo formato da rede; repetido é recusado. */
+function validateWallets(raw: unknown, errors: string[]): WalletRef[] {
+  const out: WalletRef[] = [];
+  if (raw === undefined) return out;
+  if (!Array.isArray(raw)) {
+    errors.push('"wallets" precisa ser uma lista de { chain, address }');
+    return out;
+  }
+  if (raw.length > LIMITS.maxWallets!) errors.push(`no máximo ${LIMITS.maxWallets} carteiras`);
+  for (const item of raw) {
+    const w = item as Record<string, unknown> | null;
+    if (!w || typeof w !== 'object' || Array.isArray(w)) {
+      errors.push('cada carteira precisa ser um objeto { chain, address }');
+      continue;
+    }
+    const extra = Object.keys(w).filter((k) => !WALLET_FIELDS.has(k));
+    if (extra.length) errors.push(`campo desconhecido na carteira: ${extra.join(', ')}`);
+    const chain = typeof w.chain === 'string' ? (w.chain.trim().toLowerCase() as WalletChain) : null;
+    if (!chain || !CHAINS.includes(chain)) {
+      errors.push(`rede desconhecida: ${String(w.chain)} (use ${CHAINS.join(', ')})`);
+      continue;
+    }
+    const address = typeof w.address === 'string' ? normalizeAddress(chain, w.address) : null;
+    if (!address) {
+      errors.push(`endereço inválido para ${chain}: ${String(w.address).slice(0, 64)}`);
+      continue;
+    }
+    if (out.some((x) => x.chain === chain && x.address === address)) errors.push(`carteira repetida: ${chain} ${address}`);
+    else out.push({ chain, address });
+  }
+  return out;
+}
+
+/** `discovery` ausente = desligada. Tokens de Solana, Ethereum ou Base (Bitcoin não tem token). */
+function validateDiscovery(raw: unknown, errors: string[]): DiscoveryConfig | undefined {
+  if (raw === undefined) return undefined;
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    errors.push('"discovery" precisa ser um objeto { tokens, perToken }');
+    return undefined;
+  }
+  const d = raw as Record<string, unknown>;
+  const extra = Object.keys(d).filter((k) => !DISCOVERY_FIELDS.has(k));
+  if (extra.length) errors.push(`campo desconhecido em discovery: ${extra.join(', ')}`);
+  const perToken = d.perToken ?? 5;
+  if (typeof perToken !== 'number' || !Number.isInteger(perToken) || perToken < 1 || perToken > LIMITS.maxPerToken!) {
+    errors.push(`"discovery.perToken" precisa ser um inteiro entre 1 e ${LIMITS.maxPerToken}`);
+  }
+  const tokens: DiscoveryConfig['tokens'] = [];
+  if (!Array.isArray(d.tokens)) errors.push('"discovery.tokens" precisa ser uma lista de { chain, address }');
+  else {
+    if (d.tokens.length > LIMITS.maxDiscoveryTokens!) errors.push(`no máximo ${LIMITS.maxDiscoveryTokens} tokens na descoberta`);
+    for (const item of d.tokens) {
+      const t = item as Record<string, unknown> | null;
+      if (!t || typeof t !== 'object' || Array.isArray(t)) {
+        errors.push('cada token da descoberta precisa ser { chain, address }');
+        continue;
+      }
+      const extraT = Object.keys(t).filter((k) => !WALLET_FIELDS.has(k));
+      if (extraT.length) errors.push(`campo desconhecido no token: ${extraT.join(', ')}`);
+      const chain = typeof t.chain === 'string' ? t.chain.trim().toLowerCase() : '';
+      if (chain !== 'solana' && chain !== 'ethereum' && chain !== 'base') {
+        errors.push(`rede sem token para descoberta: ${chain || '(vazio)'}`);
+        continue;
+      }
+      const address = typeof t.address === 'string' ? normalizeAddress(chain, t.address) : null;
+      if (!address) errors.push(`endereço de token inválido para ${chain}: ${String(t.address).slice(0, 64)}`);
+      else if (!tokens.some((x) => x.chain === chain && x.address === address)) tokens.push({ chain, address });
+    }
+  }
+  return { tokens, perToken: typeof perToken === 'number' ? perToken : 5 };
+}
+
 export function configPath(env: NodeJS.ProcessEnv = process.env): string {
   return env.OPENSPREAD_CONFIG || join(homedir(), '.openspread', 'config.json');
 }
@@ -168,7 +250,7 @@ export function saveConfig(file: string, config: CoreConfig): void {
  * padrão, sem sobrescrever (o usuário corrige à mão ou pela tela).
  */
 export function loadConfig(file: string, known: readonly string[], log: (msg: string) => void = () => {}): CoreConfig {
-  const fallback = (): CoreConfig => ({ ...DEFAULT_CONFIG, exchanges: [...DEFAULT_CONFIG.exchanges], pairs: [...DEFAULT_CONFIG.pairs], alerts: [], transfer: { sizeUsd: DEFAULT_CONFIG.transfer.sizeUsd, withdrawFees: {} } });
+  const fallback = (): CoreConfig => ({ ...DEFAULT_CONFIG, exchanges: [...DEFAULT_CONFIG.exchanges], pairs: [...DEFAULT_CONFIG.pairs], alerts: [], transfer: { sizeUsd: DEFAULT_CONFIG.transfer.sizeUsd, withdrawFees: {} }, wallets: [] });
   if (!existsSync(file)) {
     const config = fallback();
     try {

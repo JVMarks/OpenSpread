@@ -16,7 +16,7 @@ afterEach(() => dirs.splice(0).forEach((d) => rmSync(d, { recursive: true, force
 describe('validateConfig', () => {
   it('normaliza: ids em minúsculas, pares em maiúsculas, sem repetição; pollMs ausente = padrão', () => {
     const v = validateConfig({ exchanges: [' Binance', 'okx', 'binance'], pairs: ['btc/usdt', 'BTC/USDT', 'eth/usdt'] }, KNOWN);
-    expect(v).toEqual({ ok: true, config: { exchanges: ['binance', 'okx'], pairs: ['BTC/USDT', 'ETH/USDT'], pollMs: DEFAULT_CONFIG.pollMs, alerts: [], transfer: { sizeUsd: 1000, withdrawFees: {} } } });
+    expect(v).toEqual({ ok: true, config: { exchanges: ['binance', 'okx'], pairs: ['BTC/USDT', 'ETH/USDT'], pollMs: DEFAULT_CONFIG.pollMs, alerts: [], transfer: { sizeUsd: 1000, withdrawFees: {} }, wallets: [] } });
   });
 
   it('recusa corretora desconhecida, par fora do formato e moeda repetida', () => {
@@ -95,7 +95,7 @@ describe('arquivo de configuração', () => {
   it('salva e lê de volta; não sobra temporário', () => {
     const file = tmp();
     saveConfig(file, { exchanges: ['binance', 'kucoin'], pairs: ['BTC/USDT'], pollMs: 15_000, alerts: [{ pair: 'BTC/USDT', abovePct: 0.05 }], transfer: { sizeUsd: 1000, withdrawFees: {} } });
-    expect(loadConfig(file, KNOWN)).toEqual({ exchanges: ['binance', 'kucoin'], pairs: ['BTC/USDT'], pollMs: 15_000, alerts: [{ pair: 'BTC/USDT', abovePct: 0.05 }], transfer: { sizeUsd: 1000, withdrawFees: {} } });
+    expect(loadConfig(file, KNOWN)).toEqual({ exchanges: ['binance', 'kucoin'], pairs: ['BTC/USDT'], pollMs: 15_000, alerts: [{ pair: 'BTC/USDT', abovePct: 0.05 }], transfer: { sizeUsd: 1000, withdrawFees: {} }, wallets: [] });
     expect(existsSync(`${file}.tmp`)).toBe(false);
   });
 
