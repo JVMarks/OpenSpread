@@ -3,6 +3,8 @@
 import ccxt from 'ccxt';
 import { SpreadAlerts } from './alerts';
 import { applyTransfer } from './transfer';
+import { SpreadHistory } from './history';
+import { dirname, join } from 'node:path';
 import { configPath, LIMITS, loadConfig, saveConfig, validateConfig } from './config';
 import { Poller } from './poller';
 import { DEFAULT_PORT, startServer } from './server';
@@ -19,10 +21,27 @@ log(`lendo ${config.exchanges.length} corretoras e ${config.pairs.length} pares 
 const poller = new Poller(config.exchanges, config.pairs, { log });
 const alerts = new SpreadAlerts();
 /** Estado servido: o do Poller com o custo de transferência da configuração em cada melhor spread. */
+const history = new SpreadHistory();
+const historyFile = join(dirname(file), 'history.json');
+history.load(historyFile, Date.now());
 const current = (): CoreState => {
   const s = poller.state();
-  return { ...s, pairs: applyTransfer(s.pairs, config.transfer) };
+  return { ...s, pairs: history.apply(applyTransfer(s.pairs, config.transfer), s.at) };
 };
+const saveHistory = () => {
+  try {
+    history.save(historyFile);
+  } catch (e) {
+    log(`não consegui salvar o histórico em ${historyFile}: ${(e as Error).message}`);
+  }
+};
+setInterval(saveHistory, 5 * 60_000).unref();
+for (const sig of ['SIGINT', 'SIGTERM'] as const) {
+  process.on(sig, () => {
+    saveHistory();
+    process.exit(0);
+  });
+}
 const port = Number(process.env.OPENSPREAD_PORT ?? DEFAULT_PORT);
 
 let running = false;
@@ -32,6 +51,7 @@ const tick = async () => {
   try {
     await poller.pollOnce();
     const s = current();
+    history.record(s.pairs, s.at);
     for (const e of alerts.evaluate(config.alerts, s.pairs, s.at)) {
       log(`alerta: ${e.pair} com spread líquido de ${e.netPct.toFixed(3)}% (nível ${e.abovePct}%), ${e.buyOn} → ${e.sellOn}`);
     }

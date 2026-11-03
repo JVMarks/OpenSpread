@@ -71,6 +71,12 @@ On first run the core creates `~/.openspread/config.json` (or the path in `OPENS
   it says "not set". Not included: the transfer time (the price moves meanwhile) and moving the money back.
   The values can also be edited in Bullroom's Markets panel.
 
+The core also keeps a small history of each pair's best net spread (one sample per minute, last 25 hours) in
+`history.json`, next to `config.json`, saved every 5 minutes and on exit. With it, every pair in `/v1/state` carries
+`windows`: how much the net spread changed over 5 min, 1 h and 24 h, plus the low and high in each window (`null`
+until there is enough history). Bullroom shows them in its Spreads panel and on each room card. Deleting the file
+just starts the history over.
+
 Edit it and restart the core. A broken file is reported in the terminal and the defaults are used until it is fixed.
 To see what each exchange lists before saving: `npm run check:exchanges -- BTC/USDT ETH/USDT`.
 

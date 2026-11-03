@@ -65,7 +65,14 @@ export interface PairState {
   /** Só cotações frescas e válidas. */
   quotes: Quote[];
   best: SpreadOpportunity | null;
+  /** Variação do melhor spread líquido (com saque, quando estimado) em janelas de tempo; ausente em núcleos antigos. */
+  windows?: SpreadWindows;
 }
+
+export type SpreadWindowId = '5m' | '1h' | '24h';
+
+/** Por janela: quanto o líquido mudou (pontos percentuais) e o mínimo e o máximo nela; null = ainda sem histórico. */
+export type SpreadWindows = Record<SpreadWindowId, { changePp: number; min: number; max: number } | null>;
 
 export interface CoreState {
   rev: number;
