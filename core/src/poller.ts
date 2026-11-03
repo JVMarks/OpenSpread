@@ -6,6 +6,8 @@ import type { CheckResult, CoreState, ExchangeStatus, Listing, Quote } from './t
 
 /** O pedaço da CCXT que o núcleo usa (permite corretoras falsas nos testes). */
 export interface ExchangeLike {
+  /** Ms entre pedidos que a CCXT respeita (ausente nas corretoras falsas dos testes). */
+  rateLimit?: number;
   loadMarkets(): Promise<Record<string, { active?: boolean; taker?: number }>>;
   fetchTicker(symbol: string): Promise<{ bid?: number; ask?: number; timestamp?: number }>;
 }
@@ -16,6 +18,8 @@ export interface PollerOptions {
   maxAgeMs?: number;
   /** Tempo-limite de cada corretora na conferência (POST /v1/check). */
   checkTimeoutMs?: number;
+  /** Avisado a cada pedido à corretora (id e duração), para a sala de máquinas. */
+  onRequest?: (id: string, ms: number) => void;
 }
 
 const invert = (pair: string): string => pair.split('/').reverse().join('/');
@@ -113,7 +117,7 @@ export class Poller {
     try {
       const ex = this.exchange(id);
       if (!this.symbols.has(id)) {
-        const markets = await ex.loadMarkets();
+        const markets = await this.timed(id, () => ex.loadMarkets());
         const map = new Map<string, { symbol: string; taker: number }>();
         for (const pair of this.pairs) {
           for (const symbol of [pair, invert(pair)]) {
@@ -127,7 +131,7 @@ export class Poller {
         this.symbols.set(id, map);
       }
       for (const [pair, { symbol, taker }] of this.symbols.get(id)!) {
-        const t = await ex.fetchTicker(symbol);
+        const t = await this.timed(id, () => ex.fetchTicker(symbol));
         // Idade = quando recebemos o book. O `timestamp` do ticker é a hora do último negócio em algumas corretoras
         // (a Coinbase manda minutos atrás em par parado), e descartaria um bid/ask atual.
         const q = normalizeQuote({ exchange: id, symbol, bid: t.bid ?? Number.NaN, ask: t.ask ?? Number.NaN, takerFee: taker, at: now }, pair);
@@ -139,6 +143,20 @@ export class Poller {
       this.setStatus({ id, ok: false, error: msg, lastAt: this.status.get(id)?.lastAt });
     }
     this.rev++;
+  }
+
+  /** ms entre pedidos de cada corretora (CCXT). */
+  rateLimits(): Record<string, number | undefined> {
+    return Object.fromEntries([...this.exchanges].map(([id, ex]) => [id, ex.rateLimit]));
+  }
+
+  private async timed<T>(id: string, fn: () => Promise<T>): Promise<T> {
+    const started = performance.now();
+    try {
+      return await fn();
+    } finally {
+      this.opts.onRequest?.(id, performance.now() - started);
+    }
   }
 
   private setStatus(next: ExchangeStatus): void {

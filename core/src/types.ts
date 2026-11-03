@@ -84,6 +84,10 @@ export interface CoreState {
   alerts?: AlertEvent[];
   /** Carteiras on-chain acompanhadas (resultado, operações, ranking). Ausente em núcleos antigos. */
   wallets?: WalletsState;
+  /** Sala de máquinas: saúde do núcleo e uso de cada fonte. Ausente em núcleos antigos. */
+  machine?: MachineState;
+  /** Agenda (datas oficiais + do usuário) e radar de manchetes. Ausente em núcleos antigos. */
+  agenda?: AgendaState;
 }
 
 /** "Avise quando o spread líquido do par chegar a X%." Toca uma vez; rearma quando o spread recua. */
@@ -121,6 +125,10 @@ export interface CoreConfig {
   wallets?: WalletRef[];
   /** Descoberta de carteiras pelos top traders de tokens escolhidos (precisa da chave do Birdeye). */
   discovery?: DiscoveryConfig;
+  /** Eventos do usuário na agenda. Ausente = nenhum. */
+  events?: UserEvent[];
+  /** Feeds do radar. Ausente = radar desligado. */
+  radar?: RadarConfig;
 }
 
 export interface ConfigLimits {
@@ -138,6 +146,8 @@ export interface ConfigLimits {
   maxWallets?: number;
   maxDiscoveryTokens?: number;
   maxPerToken?: number;
+  maxEvents?: number;
+  maxFeeds?: number;
 }
 
 /** Resposta de GET /v1/config. */
@@ -282,4 +292,96 @@ export interface WalletsState {
   wallets: WalletState[];
   ranking: WalletRanking[];
   sources: WalletSource[];
+}
+
+// --- Sala de máquinas: saúde do núcleo e uso de cada fonte (só números locais) ---
+
+/** Uma fonte de dados do núcleo: corretora (CCXT), rede on-chain ou feed (agenda e radar). */
+export interface MachineSource {
+  /** Id da corretora na CCXT, ou o host da fonte (ex.: "api.mainnet-beta.solana.com"). */
+  id: string;
+  kind: 'exchange' | 'chain' | 'feed';
+  /** Rede, quando a fonte é on-chain. */
+  chain?: WalletChain;
+  ok: boolean;
+  error?: string;
+  /** Duração do último pedido, em ms. */
+  latencyMs?: number;
+  /** Pedidos no último minuto. */
+  perMin: number;
+  /** Limite conhecido de pedidos por minuto; null = não publicado. */
+  limitPerMin: number | null;
+  /** Esperando por limite de taxa até este epoch ms. */
+  backoffUntil?: number;
+}
+
+export interface MachineState {
+  at: number;
+  /** CPU do processo do núcleo, em % de um núcleo do processador. */
+  cpuPct: number;
+  /** Memória do processo (residente e heap do JS), em MB. */
+  rssMb: number;
+  heapMb: number;
+  /** Memória do computador em uso, em %. */
+  sysMemPct: number;
+  /** Há quanto tempo o núcleo está rodando, em segundos. */
+  uptimeS: number;
+  sources: MachineSource[];
+}
+
+// --- Agenda e radar (calendário com impacto e manchetes "só o que é novo"; manchete é pista, não fato) ---
+
+export type AgendaImpact = 'high' | 'medium' | 'low';
+
+/** Evento cadastrado pelo usuário no config (listagem, desbloqueio de token, atualização de rede…). */
+export interface UserEvent {
+  title: string;
+  /** Data e hora ISO 8601 com fuso (ex.: "2026-11-20T14:00:00-03:00"). */
+  at: string;
+  impact: AgendaImpact;
+  /** Pares afetados; ausente ou vazio = todas as salas. */
+  pairs?: string[];
+}
+
+/** Feeds RSS/Atom do radar e palavras extras que ligam uma manchete a todas as salas. */
+export interface RadarConfig {
+  feeds: string[];
+  keywords: string[];
+}
+
+export interface AgendaEvent {
+  id: string;
+  title: string;
+  kind: 'fomc' | 'cpi' | 'user';
+  /** Epoch ms. */
+  at: number;
+  impact: AgendaImpact;
+  /** De onde veio a data ("federalreserve.gov", "bls.gov" ou "config"). */
+  source: string;
+  url?: string;
+  origin: 'official' | 'user';
+  /** Pares afetados; vazio = todas as salas. */
+  pairs: string[];
+}
+
+export interface RadarItem {
+  /** O link (único). */
+  id: string;
+  title: string;
+  url: string;
+  /** Epoch ms da publicação. */
+  at: number;
+  /** Host do feed. */
+  source: string;
+  /** Salas (pares) que a manchete cita. */
+  pairs: string[];
+}
+
+export interface AgendaState {
+  at: number;
+  /** Do último dia até 14 dias à frente. */
+  events: AgendaEvent[];
+  /** Manchetes dos últimos 7 dias, mais novas primeiro. */
+  radar: RadarItem[];
+  feeds: Array<{ url: string; ok: boolean; error?: string; lastAt?: number }>;
 }

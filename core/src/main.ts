@@ -14,7 +14,10 @@ import { MempoolReader } from './wallets/bitcoin';
 import { SolanaReader, SOLANA_RPC } from './wallets/solana';
 import { ROUND_MS, WalletWatcher, type WatchEntry } from './wallets/watcher';
 import { discover, DISCOVERY_MS } from './wallets/birdeye';
-import type { FetchLike } from './wallets/http';
+import { setRequestHook, type FetchLike } from './wallets/http';
+import { CpuSampler, machineState, Usage } from './machine';
+import { Agenda } from './agenda/agenda';
+import { RADAR_MS } from './agenda/rss';
 import type { CoreConfig, CoreState } from './types';
 
 const ORIGINS = ['http://localhost:5173', 'http://127.0.0.1:5173', 'http://localhost:4747', 'http://127.0.0.1:4747'];
@@ -28,6 +31,10 @@ log(`lendo ${config.exchanges.length} corretoras e ${config.pairs.length} pares 
 // Carteiras on-chain: leitura pública, a cada 60 s, com cache ao lado do config. A URL do RPC da Solana pode ser a
 // de um provedor do usuário (OPENSPREAD_SOLANA_RPC); chaves de dados só no ambiente ou em keys.json.
 const keys = loadKeys(file, process.env, log);
+// Sala de máquinas: conta os pedidos de cada fonte (corretoras pelo id, on-chain pelo host)
+const usage = new Usage();
+const cpu = new CpuSampler();
+setRequestHook((host, ms) => usage.record(host, Date.now(), ms));
 const http: FetchLike = (url, init) => fetch(url, init);
 const watcher = new WalletWatcher(
   [new SolanaReader(http, process.env.OPENSPREAD_SOLANA_RPC || SOLANA_RPC), new BlockscoutReader('ethereum', http), new BlockscoutReader('base', http, keys.blockscout), new MempoolReader(http)],
@@ -76,7 +83,25 @@ setInterval(() => void watchTick(), ROUND_MS).unref();
 setInterval(() => void runDiscovery(), DISCOVERY_MS).unref();
 void runDiscovery().then(() => watchTick());
 
-const poller = new Poller(config.exchanges, config.pairs, { log });
+// Agenda e radar: datas oficiais embutidas, eventos do config e manchetes dos feeds escolhidos (a cada 15 min)
+const agenda = new Agenda(http, { cacheFile: join(dirname(file), 'cache', 'radar.json'), log });
+agenda.load();
+let reading = false;
+const radarTick = async () => {
+  if (reading) return;
+  reading = true;
+  try {
+    await agenda.refresh(config);
+  } catch (e) {
+    log(`radar: leitura falhou: ${(e as Error).message}`);
+  } finally {
+    reading = false;
+  }
+};
+setInterval(() => void radarTick(), RADAR_MS).unref();
+void radarTick();
+
+const poller = new Poller(config.exchanges, config.pairs, { log, onRequest: (id, ms) => usage.record(id, Date.now(), ms) });
 const alerts = new SpreadAlerts();
 /** Estado servido: o do Poller com o custo de transferência da configuração em cada melhor spread. */
 const history = new SpreadHistory();
@@ -84,8 +109,10 @@ const historyFile = join(dirname(file), 'history.json');
 history.load(historyFile, Date.now());
 const current = (): CoreState => {
   const s = poller.state();
-  const out: CoreState = { ...s, rev: s.rev + watcher.rev, pairs: history.apply(applyTransfer(s.pairs, config.transfer), s.at) };
+  const out: CoreState = { ...s, rev: s.rev + watcher.rev + agenda.rev, pairs: history.apply(applyTransfer(s.pairs, config.transfer), s.at) };
   if (watcher.hasWallets()) out.wallets = watcher.state(s.at);
+  out.agenda = agenda.state(config, s.at);
+  out.machine = machineState({ now: s.at, cpuPct: cpu.sample(), exchanges: s.exchanges, rateLimits: poller.rateLimits(), chains: out.wallets?.sources ?? [], feeds: out.agenda.feeds, usage });
   return out;
 };
 const saveHistory = () => {
@@ -139,6 +166,7 @@ const server = startServer(() => ({ ...current(), alerts: alerts.events() }), {
       void tick();
       const discoveryChanged = JSON.stringify(prev.discovery ?? null) !== JSON.stringify(next.discovery ?? null);
       watchList();
+      if (JSON.stringify(prev.radar ?? null) !== JSON.stringify(next.radar ?? null)) void radarTick();
       if (discoveryChanged) void runDiscovery().then(() => watchTick());
       else void watchTick();
       log(`configuração salva: ${next.exchanges.length} corretoras, ${next.pairs.length} pares, ${next.alerts.length} alertas, ${next.wallets?.length ?? 0} carteiras, a cada ${next.pollMs / 1000} s`);

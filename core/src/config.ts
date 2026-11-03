@@ -4,7 +4,7 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from '
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { normalizeAddress } from './wallets/address';
-import type { ConfigLimits, CoreConfig, DiscoveryConfig, SpreadAlert, TransferConfig, WalletChain, WalletRef } from './types';
+import type { AgendaImpact, ConfigLimits, CoreConfig, DiscoveryConfig, RadarConfig, SpreadAlert, TransferConfig, UserEvent, WalletChain, WalletRef } from './types';
 
 export const DEFAULT_CONFIG: Readonly<CoreConfig> = Object.freeze({
   exchanges: ['binance', 'okx', 'bybit', 'kraken', 'coinbaseexchange'],
@@ -29,13 +29,20 @@ export const LIMITS: Readonly<ConfigLimits> = Object.freeze({
   maxWallets: 30,
   maxDiscoveryTokens: 5,
   maxPerToken: 10,
+  maxEvents: 50,
+  maxFeeds: 10,
 });
 
 const MAX_FEE = 1_000_000;
 const MAX_FEE_ENTRIES = 200;
 const ASSET = /^[A-Z0-9]{2,12}$/;
 
-const FIELDS = new Set(['exchanges', 'pairs', 'pollMs', 'alerts', 'transfer', 'wallets', 'discovery']);
+const FIELDS = new Set(['exchanges', 'pairs', 'pollMs', 'alerts', 'transfer', 'wallets', 'discovery', 'events', 'radar']);
+const EVENT_FIELDS = new Set(['title', 'at', 'impact', 'pairs']);
+const RADAR_FIELDS = new Set(['feeds', 'keywords']);
+const IMPACTS: readonly AgendaImpact[] = ['high', 'medium', 'low'];
+/** Data e hora com fuso explícito (Z ou ±hh:mm): sem fuso, a hora mudaria com o computador. */
+const ISO_WITH_ZONE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2})$/;
 const WALLET_FIELDS = new Set(['chain', 'address']);
 const DISCOVERY_FIELDS = new Set(['tokens', 'perToken']);
 const CHAINS: readonly WalletChain[] = ['solana', 'ethereum', 'base', 'bitcoin'];
@@ -110,8 +117,12 @@ export function validateConfig(raw: unknown, known: readonly string[]): Validati
   const transfer = validateTransfer(r.transfer, known, errors);
   const wallets = validateWallets(r.wallets, errors);
   const discovery = validateDiscovery(r.discovery, errors);
+  const events = validateEvents(r.events, pairs, errors);
+  const radar = validateRadar(r.radar, errors);
 
-  return errors.length ? { ok: false, errors } : { ok: true, config: { exchanges, pairs, pollMs, alerts, transfer, wallets, ...(discovery ? { discovery } : {}) } };
+  return errors.length
+    ? { ok: false, errors }
+    : { ok: true, config: { exchanges, pairs, pollMs, alerts, transfer, wallets, ...(discovery ? { discovery } : {}), ...(events ? { events } : {}), ...(radar ? { radar } : {}) } };
 }
 
 /** `transfer` ausente = padrão (US$ 1.000, nenhuma taxa). Corretora precisa existir na CCXT; moeda em maiúsculas. */
@@ -231,6 +242,93 @@ function validateDiscovery(raw: unknown, errors: string[]): DiscoveryConfig | un
     }
   }
   return { tokens, perToken: typeof perToken === 'number' ? perToken : 5 };
+}
+
+/** `events` ausente = nenhum. Título curto, hora com fuso, impacto e pares da lista (ausente = todas as salas). */
+function validateEvents(raw: unknown, pairs: readonly string[], errors: string[]): UserEvent[] | undefined {
+  if (raw === undefined) return undefined;
+  if (!Array.isArray(raw)) {
+    errors.push('"events" precisa ser uma lista de { title, at, impact, pairs? }');
+    return undefined;
+  }
+  if (raw.length > LIMITS.maxEvents!) errors.push(`no máximo ${LIMITS.maxEvents} eventos`);
+  const out: UserEvent[] = [];
+  for (const item of raw) {
+    const e = item as Record<string, unknown> | null;
+    if (!e || typeof e !== 'object' || Array.isArray(e)) {
+      errors.push('cada evento precisa ser um objeto { title, at, impact, pairs? }');
+      continue;
+    }
+    const extra = Object.keys(e).filter((k) => !EVENT_FIELDS.has(k));
+    if (extra.length) errors.push(`campo desconhecido no evento: ${extra.join(', ')}`);
+    const title = typeof e.title === 'string' ? e.title.replace(/\s+/g, ' ').trim() : '';
+    if (title.length < 2 || title.length > 80) errors.push('título do evento precisa ter de 2 a 80 caracteres');
+    const at = typeof e.at === 'string' ? e.at.trim() : '';
+    if (!ISO_WITH_ZONE.test(at) || !Number.isFinite(Date.parse(at))) errors.push(`hora do evento precisa ser ISO com fuso (ex.: 2026-11-20T14:00:00-03:00): ${String(e.at).slice(0, 40)}`);
+    const impact = e.impact as AgendaImpact;
+    if (!IMPACTS.includes(impact)) errors.push(`impacto do evento precisa ser ${IMPACTS.join(', ')}`);
+    let evPairs: string[] | undefined;
+    if (e.pairs !== undefined) {
+      if (!Array.isArray(e.pairs) || !e.pairs.every((p) => typeof p === 'string')) errors.push('"pairs" do evento precisa ser uma lista de pares');
+      else {
+        evPairs = [...new Set(e.pairs.map((p) => p.trim().toUpperCase()))];
+        const off = evPairs.filter((p) => !pairs.includes(p));
+        if (off.length) errors.push(`evento para um par fora da lista: ${off.join(', ')}`);
+      }
+    }
+    out.push({ title, at, impact, ...(evPairs && evPairs.length ? { pairs: evPairs } : {}) });
+  }
+  return out;
+}
+
+/** Só http(s) e nada da rede local (o núcleo é quem busca: não vira ponte para o roteador ou outra máquina). */
+export function feedUrl(raw: string): string | null {
+  try {
+    const u = new URL(raw.trim());
+    if (u.protocol !== 'https:' && u.protocol !== 'http:') return null;
+    if (u.username || u.password) return null;
+    const host = u.hostname.toLowerCase().replace(/^\[|\]$/g, '');
+    if (host === 'localhost' || host.endsWith('.local') || host.endsWith('.localhost') || !host.includes('.') && !host.includes(':')) return null;
+    if (/^(127\.|10\.|0\.|169\.254\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(host) || host === '::1' || /^f[cd]/.test(host) || /^fe80:/.test(host)) return null;
+    return u.href;
+  } catch {
+    return null;
+  }
+}
+
+/** `radar` ausente = desligado. Até 10 feeds e 20 palavras. */
+function validateRadar(raw: unknown, errors: string[]): RadarConfig | undefined {
+  if (raw === undefined) return undefined;
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    errors.push('"radar" precisa ser um objeto { feeds, keywords }');
+    return undefined;
+  }
+  const r = raw as Record<string, unknown>;
+  const extra = Object.keys(r).filter((k) => !RADAR_FIELDS.has(k));
+  if (extra.length) errors.push(`campo desconhecido em radar: ${extra.join(', ')}`);
+  const feeds: string[] = [];
+  if (!Array.isArray(r.feeds) || !r.feeds.every((x) => typeof x === 'string')) errors.push('"radar.feeds" precisa ser uma lista de endereços');
+  else {
+    if (r.feeds.length > LIMITS.maxFeeds!) errors.push(`no máximo ${LIMITS.maxFeeds} feeds`);
+    for (const f of r.feeds) {
+      const u = feedUrl(f);
+      if (!u) errors.push(`feed inválido (use um endereço http ou https público): ${f.slice(0, 80)}`);
+      else if (!feeds.includes(u)) feeds.push(u);
+    }
+  }
+  const keywords: string[] = [];
+  if (r.keywords !== undefined) {
+    if (!Array.isArray(r.keywords) || !r.keywords.every((x) => typeof x === 'string')) errors.push('"radar.keywords" precisa ser uma lista de palavras');
+    else {
+      if (r.keywords.length > 20) errors.push('no máximo 20 palavras no radar');
+      for (const k of r.keywords) {
+        const w = k.trim().toLowerCase();
+        if (w.length < 2 || w.length > 30) errors.push(`palavra do radar precisa ter de 2 a 30 caracteres: ${k.slice(0, 40)}`);
+        else if (!keywords.includes(w)) keywords.push(w);
+      }
+    }
+  }
+  return { feeds, keywords };
 }
 
 export function configPath(env: NodeJS.ProcessEnv = process.env): string {
