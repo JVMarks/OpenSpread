@@ -385,3 +385,32 @@ export interface AgendaState {
   radar: RadarItem[];
   feeds: Array<{ url: string; ok: boolean; error?: string; lastAt?: number }>;
 }
+
+// --- Motor (etapa 3: só paper). A trava de risco decide; os limites vêm só do usuário. ---
+
+/** Limites que toda operação precisa respeitar. Valores em dólar; percentuais em % (0,05 = 0,05%). */
+export interface RiskPolicy {
+  maxTradeUsd: number;
+  minNetPct: number;
+  maxQuoteAgeMs: number;
+  /** Perda diária máxima por robô (positivo). */
+  dailyLossLimitUsd: number;
+  /** Pares que podem operar; vazio = nada opera. */
+  allowedPairs: string[];
+}
+
+export interface RiskReason {
+  /** Estável, para a interface traduzir (ex.: "no_balance_buy"). */
+  code: string;
+  message: string;
+  /** O que fazer para destravar. */
+  fix: string;
+}
+
+export interface RiskVerdict {
+  result: 'PASS' | 'BLOCK';
+  reasons: RiskReason[];
+  /** sha256 da operação exata + dia UTC. */
+  fingerprint: string;
+  checkedAt: number;
+}
