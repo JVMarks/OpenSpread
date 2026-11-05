@@ -21,6 +21,7 @@
   <meta property="og:image:height" content="630">
   <meta name="twitter:card" content="summary_large_image">
   <link rel="alternate" hreflang="en" href="../">
+  <link rel="preload" href="../assets/fonts/Anton-Regular.ttf" as="font" type="font/ttf" crossorigin>
   <link rel="stylesheet" href="../assets/site.css">
   <script src="../assets/site.js" defer></script>
 </head>
@@ -42,43 +43,82 @@
     </div>
   </nav>
 
-  <header class="hero">
-    <div class="board">
-      <div class="wrap board-top">
-        <p class="board-cap" aria-hidden="true"></p>
-        <div class="board-legend" aria-label="Mensagens do placar"></div>
-      </div>
-      <canvas aria-hidden="true"></canvas>
-      <ol class="board-msgs" aria-label="Leitura de exemplo">
-        <li data-key="SPREAD" data-color="red" data-cap="&lt;b&gt;USDC/USDT&lt;/b&gt; · MELHOR SPREAD LÍQUIDO, SEM AS DUAS TAXAS">−0,20%</li>
-        <li data-key="CORRETORAS" data-color="green" data-cap="&lt;b&gt;BINANCE · OKX · BYBIT · KRAKEN · COINBASE&lt;/b&gt; · SÓ LEITURA">5 AO VIVO</li>
-        <li data-key="TAXAS" data-color="amber" data-cap="&lt;b&gt;CADA LADO COBRA&lt;/b&gt; · A PLACA DESCONTA AS DUAS">TAXA+TAXA</li>
-        <li data-key="ALERTA" data-color="green" data-cap="&lt;b&gt;ALERTA DE SPREAD&lt;/b&gt; · TOCA UMA VEZ NO SEU NÍVEL E REARMA ABAIXO DELE">≥0,05%</li>
-        <li data-key="PAPER" data-color="amber" data-cap="&lt;b&gt;ROBÔS SOBRE O LIVRO REAL&lt;/b&gt; · SEM CHAVE E SEM ORDEM REAL">SIMULADO</li>
-      </ol>
-    </div>
-    <div class="wrap hero-copy">
-      <div>
-        <span class="pill amber">CÓDIGO ABERTO · LOCAL-FIRST</span>
-        <h1><span class="l1">Veja o spread.</span><br><span class="g">Guarde as chaves.<span class="caret" aria-hidden="true"></span></span></h1>
-      </div>
-      <div>
-        <p class="lead">O OpenSpread lê cinco corretoras a partir do seu computador e mostra o spread real, já sem as duas taxas, mesmo quando ele é negativo. O Bullroom transforma isso num pregão em pixel art que avisa quando a conta finalmente fecha.</p>
-        <div class="cta">
-          <a class="btn primary" href="../demo/?mock=trading&amp;speed=5">▶ Abrir a demo</a>
-          <a class="btn ghost" href="#video">Ver o vídeo de 40 s</a>
-        </div>
-      </div>
-    </div>
-    <p class="hero-note">Leitura de exemplo de 26/10/2026 · nível do alerta é só um exemplo · não é recomendação</p>
-  </header>
-
   <main>
-    <section class="block" id="video" aria-labelledby="video-h">
+    <div class="cine">
+      <div class="stage">
+        <canvas class="led" aria-hidden="true"></canvas>
+        <div class="world" aria-hidden="true" data-live="../assets/img/live-pt-BR.webp" data-paper="../assets/img/paper-room-pt-BR.webp" data-bull="../assets/img/mascot-trader.webp" data-bust="../assets/img/mascot-bust.webp"></div>
+        <div class="veil" aria-hidden="true"></div>
+        <header class="hero">
+          <p class="cap" aria-hidden="true"></p>
+          <ol class="board-msgs" aria-label="Leitura de exemplo">
+            <li data-color="red" data-cap="&lt;b&gt;USDC/USDT&lt;/b&gt; · MELHOR SPREAD LÍQUIDO, SEM AS DUAS TAXAS">−0,20%</li>
+            <li data-color="green" data-cap="&lt;b&gt;BINANCE · OKX · BYBIT · KRAKEN · COINBASE&lt;/b&gt; · SÓ LEITURA">5 AO VIVO</li>
+            <li data-color="amber" data-cap="&lt;b&gt;CADA LADO COBRA&lt;/b&gt; · A PLACA DESCONTA AS DUAS">TAXA+TAXA</li>
+            <li data-color="green" data-cap="&lt;b&gt;ALERTA DE SPREAD&lt;/b&gt; · TOCA UMA VEZ NO SEU NÍVEL E REARMA ABAIXO DELE">≥0,05%</li>
+            <li data-color="violet" data-cap="&lt;b&gt;ROBÔS SOBRE O LIVRO REAL&lt;/b&gt; · SEM CHAVE E SEM ORDEM REAL">SIMULADO</li>
+          </ol>
+          <div class="hero-grid">
+            <div>
+              <p class="eyebrow">CÓDIGO ABERTO · LOCAL-FIRST</p>
+              <h1><span>Veja o spread.</span><span class="m">Guarde as chaves.</span></h1>
+            </div>
+            <div>
+              <p class="lead">O OpenSpread lê cinco corretoras a partir do seu computador e mostra o spread real, já sem as duas taxas, mesmo quando ele é negativo. O Bullroom transforma isso num pregão em pixel art que avisa quando a conta finalmente fecha.</p>
+              <div class="cta">
+                <a class="btn primary" href="../demo/?mock=trading&amp;speed=5">▶ Abrir a demo</a>
+                <a class="btn ghost" href="#video">Ver o vídeo de 40 s</a>
+              </div>
+            </div>
+          </div>
+          <p class="note">Leitura de exemplo de 26/10/2026 · nível do alerta é só um exemplo · não é recomendação</p>
+        </header>
+        <section class="floors" id="sala" aria-labelledby="sala-h">
+          <figure class="floors-static">
+            <img src="../assets/img/live-pt-BR.webp" alt="Prédio do Bullroom visto de cima: recepção, copa, sala de estar e salas de operação, com as corretoras como personagens" width="1600" height="900" loading="lazy">
+            <figcaption>Bullroom lendo o OpenSpread, ao vivo e só leitura. Nenhuma chave, nenhuma ordem, nenhum servidor nosso.</figcaption>
+          </figure>
+          <article class="floor" data-room="usdc">
+            <div class="big neg">−0,20%</div>
+            <h2 id="sala-h">Cada corretora é um trader. <em>Cada par é uma sala.</em></h2>
+            <p>O balão sobre cada corretora mostra o preço dela contra a média da sala, em pontos-base. A placa sobre cada sala mostra o melhor spread entre duas corretoras quaisquer, já sem as duas taxas.</p>
+            <small>Ao vivo e só leitura. Nenhuma chave, nenhuma ordem, nenhum servidor nosso.</small>
+          </article>
+          <article class="floor" data-room="usde">
+            <div class="big must">≥ 0,05%</div>
+            <h2>A sala <em>toca uma vez.</em></h2>
+            <p>Escolha um nível por par. A sala toca uma vez quando o spread chega lá, e rearma abaixo dele.</p>
+            <small>O nível é só um exemplo.</small>
+          </article>
+          <article class="floor" data-room="maq">
+            <div class="big gain word">LATÊNCIA · LIMITES</div>
+            <h2>Um rack <em>por fonte.</em></h2>
+            <p>A sala de máquinas mostra a latência e o limite de cada API, medidos no seu computador. Nada é enviado para nós.</p>
+          </article>
+          <article class="floor" data-room="sim">
+            <div class="big vio">1,09% → 1,01%</div>
+            <h2>A sala roxa é <em>simulada.</em></h2>
+            <p>Robôs sobre o livro de ofertas real, sem chave e sem ordem real. O resultado simulado nunca soma com o spread real.</p>
+            <small>Cotado contra realizado. Exemplo de 04/11/2026.</small>
+          </article>
+          <div class="rail" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+        </section>
+      </div>
+    </div>
+
+    <section class="diag fee" aria-labelledby="fee-h">
+      <div class="wrap">
+        <p class="num" aria-hidden="true">−0,20%</p>
+        <h2 id="fee-h">Hoje a taxa <em>come tudo.</em></h2>
+        <p class="sub">A diferença entre as corretoras é real. Depois da taxa de compra e da de venda, não sobra nada. A sala mostra assim mesmo, e toca uma vez no dia em que a conta fechar.</p>
+        <p class="hint">USDC/USDT, leitura de exemplo de 26/10/2026. Não é recomendação.</p>
+      </div>
+    </section>
+
+    <section class="block video" id="video" aria-labelledby="video-h">
       <div class="wrap reel">
         <div class="head">
-          <div class="kicker"><i>02</i> ASSISTA</div>
-          <h2 id="video-h">40 segundos, um número honesto.</h2>
+          <h2 id="video-h">40 segundos, <em>um número honesto.</em></h2>
           <p class="sub">Cinco corretoras numa sala, ao vivo. Por que a arbitragem clássica de dólar digital não fecha hoje, e como a sala te avisa no dia em que fechar.</p>
         </div>
         <div class="phone-wrap">
@@ -87,7 +127,7 @@
               <track kind="captions" srclang="pt-BR" label="Português" src="../assets/video/bullroom-reel.pt.vtt" default>
             </video>
             <span class="glare" aria-hidden="true"></span>
-            <button class="sound" type="button" data-off="🔇 TOQUE PARA OUVIR" data-on="🔊 SOM LIGADO" aria-pressed="false">🔇 TOQUE PARA OUVIR</button>
+            <button class="sound" type="button" data-off="TOQUE PARA OUVIR" data-on="SOM LIGADO" aria-pressed="false">TOQUE PARA OUVIR</button>
           </div>
         </div>
         <div>
@@ -104,89 +144,11 @@
       </div>
     </section>
 
-    <section class="block" id="sala" aria-labelledby="sala-h">
+    <section class="block diag paper" id="paper" aria-labelledby="paper-h">
       <div class="wrap">
         <div class="head">
-          <div class="kicker"><i>03</i> A SALA</div>
-          <h2 id="sala-h">Cada corretora é um trader. Cada par é uma sala.</h2>
-          <p class="sub">Role e o prédio pousa, do jeito que o Bullroom desenha. A placa de cada sala mostra o melhor spread entre as corretoras depois das taxas. Hoje ele é negativo: a diferença existe, e a taxa come tudo.</p>
-        </div>
-        <figure>
-          <div class="building">
-            <div class="scene">
-              <div class="shadow"></div>
-              <div class="slab">
-                <div class="top" role="img" aria-label="Prédio do Bullroom visto de cima: recepção, copa, sala de estar e duas salas de operação, USDC/USDT e USDE/USDT, com as corretoras como personagens"></div>
-                <div class="side s"></div><div class="side e"></div>
-                <span class="ring" aria-hidden="true"></span>
-                <div class="sign usdc hot" aria-hidden="true"><div class="card">USDC/USDT · 5<b class="neg">−0,20%</b><small>já sem as duas taxas</small></div></div>
-                <div class="sign usde" aria-hidden="true"><div class="card">USDE/USDT · 3<b class="neg">−0,21%</b><small>exemplo de alerta: ≥ 0,05%</small></div></div>
-                <div class="sign recp" aria-hidden="true"><div class="card">Recepção<small> · Bullroom</small></div></div>
-              </div>
-            </div>
-            <img class="mascot" src="../assets/img/mascot-trader.webp" alt="" width="272" height="360" loading="lazy">
-          </div>
-          <figcaption>Bullroom lendo o OpenSpread, ao vivo e só leitura. Nenhuma chave, nenhuma ordem, nenhum servidor nosso.</figcaption>
-        </figure>
-        <div class="facts">
-          <div data-tilt><b>BALÃO</b><p>Sobre cada corretora: o preço dela contra a média da sala, em pontos-base.</p></div>
-          <div data-tilt><b>PLACA</b><p>Sobre cada sala: o melhor spread entre duas corretoras quaisquer, já sem as duas taxas.</p></div>
-          <div data-tilt><b>ALERTA</b><p>Escolha um nível por par. A sala toca uma vez quando o spread chega lá, e rearma abaixo dele.</p></div>
-        </div>
-      </div>
-    </section>
-
-    <section class="block" id="ferramentas" aria-labelledby="ferramentas-h">
-      <div class="wrap">
-        <div class="head">
-          <div class="kicker"><i>04</i> DUAS FERRAMENTAS</div>
-          <h2 id="ferramentas-h">O motor e a janela.</h2>
-        </div>
-        <div class="cards">
-          <article class="card" data-tilt>
-            <img src="../assets/img/sign.webp" alt="Placa da recepção do Bullroom em estilo placar" width="900" height="420" loading="lazy">
-            <div class="body">
-              <h3>OpenSpread</h3>
-              <p class="role">O motor, no seu computador.</p>
-              <ul>
-                <li>Lê os preços públicos da Binance, OKX, Bybit, Kraken e Coinbase.</li>
-                <li>Mostra o spread líquido, já sem a taxa de compra e a de venda. Negativo continua negativo.</li>
-                <li>Suas corretoras e pares num arquivo local, <code>~/.openspread/config.json</code>.</li>
-                <li>Alertas de spread que tocam uma vez e rearmam, sem ficar piscando.</li>
-                <li><span class="pill amber">NOVO</span>Paper trading embutido, com trava de risco a cada oportunidade.</li>
-                <li>Serve tudo em <code>127.0.0.1</code>, sem servidor nosso: só faz pedidos públicos a corretoras, redes e os feeds que você escolher.</li>
-              </ul>
-              <div class="actions"><a class="btn ghost" href="https://github.com/JVMarks/OpenSpread">OpenSpread no GitHub</a></div>
-            </div>
-          </article>
-          <article class="card" data-tilt>
-            <img src="../assets/img/sim-pt-BR.webp" alt="Pregão simulado do Bullroom com robôs nas mesas, PL sobre a cabeça e o feed de operações" width="1600" height="900" loading="lazy">
-            <div class="body">
-              <h3>Bull<span class="pos">room</span></h3>
-              <p class="role">A janela: seus robôs como um escritório.</p>
-              <ul>
-                <li>Sentado está posicionado; circulando está zerado.</li>
-                <li>O PL flutua sobre cada cabeça; a placa soma a sala.</li>
-                <li>Painel Mercados: escolha corretoras e pares, e crie alertas, de dentro da sala.</li>
-                <li>O robô que bate o limite de perda do dia é ejetado da sala.</li>
-                <li><span class="pill amber">NOVO</span>Sala de simulação e painel Robôs: ligue, pare e veja o motivo de cada parada.</li>
-                <li>Simulado no navegador, ou ao vivo com o OpenSpread.</li>
-              </ul>
-              <div class="actions">
-                <a class="btn primary" href="../demo/?mock=trading&amp;speed=5">▶ Abrir a demo</a>
-                <a class="btn ghost" href="https://github.com/JVMarks/bullroom">Bullroom no GitHub</a>
-              </div>
-            </div>
-          </article>
-        </div>
-      </div>
-    </section>
-
-    <section class="block" id="paper" aria-labelledby="paper-h">
-      <div class="wrap">
-        <div class="head">
-          <div class="kicker"><i>05</i> PAPER TRADING</div>
-          <h2 id="paper-h">Simule. A conta continua honesta.</h2>
+          <span class="stamp">SIMULATED</span>
+          <h2 id="paper-h">Simule. <em>A conta continua honesta.</em></h2>
           <p class="sub">Robôs de arbitragem sobre o livro de ofertas real, com trava de risco e saldo de mentira. Sem chave, sem ordem real, nada para instalar além do núcleo.</p>
         </div>
         <div class="paper-main">
@@ -195,11 +157,9 @@
             <figcaption>Todos os robôs ficam numa sala roxa só, com o selo SIMULATED. O resultado simulado nunca soma com o spread real.</figcaption>
           </figure>
           <div>
-            <div class="paper-nums">
-              <div class="paper-num" data-tilt><strong>1,09% <i>→</i> <em>1,01%</em></strong><span>Cotado contra realizado: quanto do spread sobrou depois de caminhar pelo livro.</span></div>
-              <div class="paper-num" data-tilt><strong class="neg">0 de 178</strong><span>Leituras de BTC/USDT acima do mínimo. Robô quieto ali é resultado, não defeito.</span></div>
-              <div class="paper-num" data-tilt><strong class="pos">16 de 1.227</strong><span>Combinações de pares em USDT com líquido positivo numa varredura de 5 corretoras. Spread alto pode ser saque suspenso.</span></div>
-            </div>
+            <div class="paper-num"><strong>1,09% <i>→</i> <em>1,01%</em></strong><span>Cotado contra realizado: quanto do spread sobrou depois de caminhar pelo livro.</span></div>
+            <div class="paper-num"><strong>0 de 178</strong><span>Leituras de BTC/USDT acima do mínimo. Robô quieto ali é resultado, não defeito.</span></div>
+            <div class="paper-num"><strong>16 de 1.227</strong><span>Combinações de pares em USDT com líquido positivo numa varredura de 5 corretoras. Spread alto pode ser saque suspenso.</span></div>
             <p class="hint">Exemplos de 04/11/2026. Paper trading não garante resultado real. Sem backtest de arbitragem, e a falha de uma perna só não é simulada.</p>
           </div>
         </div>
@@ -213,12 +173,48 @@
       </div>
     </section>
 
-    <section class="block" id="rodar" aria-labelledby="rodar-h">
+    <section class="tools" id="ferramentas" aria-labelledby="ferramentas-h">
       <div class="wrap">
-        <div class="head">
-          <div class="kicker"><i>06</i> COMO RODAR</div>
-          <h2 id="rodar-h">Dois repositórios. Node 22.12 ou mais novo.</h2>
+        <div class="head"><h2 id="ferramentas-h">O motor e a janela.</h2></div>
+        <div class="tool-grid">
+          <article class="tool">
+            <div class="shot" data-tilt><img src="../assets/img/machines-pt-BR.webp" alt="Sala de máquinas do Bullroom: um rack por fonte de dados, com latência e limites no telão" width="620" height="443" loading="lazy"></div>
+            <h3>OpenSpread</h3>
+            <p class="role">O motor, no seu computador.</p>
+            <ul>
+              <li>Lê os preços públicos da Binance, OKX, Bybit, Kraken e Coinbase.</li>
+              <li>Mostra o spread líquido, já sem a taxa de compra e a de venda. Negativo continua negativo.</li>
+              <li>Suas corretoras e pares num arquivo local, <code>~/.openspread/config.json</code>.</li>
+              <li>Alertas de spread que tocam uma vez e rearmam, sem ficar piscando.</li>
+              <li><span class="pill">NOVO</span>Paper trading embutido, com trava de risco antes de cada ordem simulada.</li>
+              <li>Serve tudo em <code>127.0.0.1</code>, sem servidor nosso: só faz pedidos públicos a corretoras, redes e os feeds que você escolher.</li>
+            </ul>
+            <div class="actions"><a class="btn ghost" href="https://github.com/JVMarks/OpenSpread">OpenSpread no GitHub</a></div>
+          </article>
+          <article class="tool">
+            <div class="shot" data-tilt><img src="../assets/img/sim-pt-BR.webp" alt="Pregão simulado do Bullroom com robôs nas mesas, PL sobre a cabeça e o feed de operações" width="1600" height="900" loading="lazy"></div>
+            <h3>Bullroom</h3>
+            <p class="role">A janela: seus robôs como um escritório.</p>
+            <ul>
+              <li>Sentado está posicionado; circulando está zerado.</li>
+              <li>O PL flutua sobre cada cabeça; a placa soma a sala.</li>
+              <li>Painel Mercados: escolha corretoras e pares, e crie alertas, de dentro da sala.</li>
+              <li>O robô que bate o limite de perda do dia é ejetado da sala.</li>
+              <li><span class="pill">NOVO</span>Sala de simulação e painel Robôs: ligue, pare e veja o motivo de cada parada.</li>
+              <li>Simulado no navegador, ou ao vivo com o OpenSpread.</li>
+            </ul>
+            <div class="actions">
+              <a class="btn primary" href="../demo/?mock=trading&amp;speed=5">▶ Abrir a demo</a>
+              <a class="btn ghost" href="https://github.com/JVMarks/bullroom">Bullroom no GitHub</a>
+            </div>
+          </article>
         </div>
+      </div>
+    </section>
+
+    <section class="block run" id="rodar" aria-labelledby="rodar-h">
+      <div class="wrap">
+        <div class="head"><h2 id="rodar-h">Dois repositórios. <em>Node 22.12 ou mais novo.</em></h2></div>
         <div class="runs">
           <div>
             <h3>1. OpenSpread (preços ao vivo)</h3>
@@ -241,27 +237,21 @@
       </div>
     </section>
 
-    <section class="block" aria-labelledby="regras">
+    <section class="block rules" aria-labelledby="regras">
       <div class="wrap">
-        <div class="head">
-          <div class="kicker"><i>07</i> PRINCÍPIOS</div>
-          <h2 id="regras">O que não muda.</h2>
-        </div>
-        <div class="grid4">
-          <div class="tile" data-tilt><span class="n">01</span><b>Local-first</b><p>Nenhum servidor nosso, nenhum cookie, nenhum rastreio. Roda no seu computador.</p></div>
-          <div class="tile" data-tilt><span class="n">02</span><b>As chaves ficam com você</b><p>Quando as chaves chegarem, ficam na sua máquina, nunca com permissão de saque.</p></div>
-          <div class="tile" data-tilt><span class="n">03</span><b>A IA propõe</b><p>O motor executa, dentro da política de risco que você define. A IA nunca envia ordem.</p></div>
-          <div class="tile" data-tilt><span class="n">04</span><b>Números honestos</b><p>Perdas aparecem. Simulado é sempre marcado. Negativo continua negativo.</p></div>
-        </div>
+        <div class="head"><h2 id="regras">O que não muda.</h2></div>
+        <ul class="rule-list">
+          <li><b>Local-first</b><p>Nenhum servidor nosso, nenhum cookie, nenhum rastreio. Roda no seu computador.</p></li>
+          <li><b>As chaves ficam com você</b><p>Quando as chaves chegarem, ficam na sua máquina, nunca com permissão de saque.</p></li>
+          <li><b>A IA propõe</b><p>O motor executa, dentro da política de risco que você define. A IA nunca envia ordem.</p></li>
+          <li><b>Números honestos</b><p>Perdas aparecem. Simulado é sempre marcado. Negativo continua negativo.</p></li>
+        </ul>
       </div>
     </section>
 
-    <section class="block" id="roteiro" aria-labelledby="roteiro-h">
+    <section class="block road-sec" id="roteiro" aria-labelledby="roteiro-h">
       <div class="wrap">
-        <div class="head">
-          <div class="kicker"><i>08</i> ROTEIRO</div>
-          <h2 id="roteiro-h">Construído em etapas, em público.</h2>
-        </div>
+        <div class="head"><h2 id="roteiro-h">Construído em etapas, <em>em público.</em></h2></div>
         <ol class="road">
           <li><span class="st done">FEITO</span><span>Bullroom: robôs simulados, PL sobre a cabeça, placas das salas, cartão do robô com 5m/1h/24h.</span></li>
           <li><span class="st done">FEITO</span><span>Núcleo do OpenSpread: spreads líquidos ao vivo, só leitura, de cinco corretoras.</span></li>
@@ -333,7 +323,7 @@
         <a href="https://github.com/JVMarks/OpenSpread" rel="noopener" aria-label="GitHub" title="GitHub"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg></a>
       </nav>
       <p class="warn">Projeto educativo. Não é recomendação de investimento. Nenhuma promessa de retorno.</p>
-      <p>O Bullroom é um fork do <a href="https://github.com/marmottajr/habblaud">habblaud</a>, de Márcio Junior (MIT). Dados de mercado via <a href="https://github.com/ccxt/ccxt">CCXT</a> (MIT). Fontes: Pixelify Sans e Poppins (<a href="../assets/fonts/OFL-PixelifySans.txt">OFL</a>). Ícones: <a href="https://simpleicons.org">Simple Icons</a> (CC0); as marcas pertencem aos seus donos.</p>
+      <p>O Bullroom é um fork do <a href="https://github.com/marmottajr/habblaud">habblaud</a>, de Márcio Junior (MIT). Dados de mercado via <a href="https://github.com/ccxt/ccxt">CCXT</a> (MIT). Fontes: Anton, Pixelify Sans e Poppins (<a href="../assets/fonts/OFL-Anton.txt">OFL</a>, <a href="../assets/fonts/OFL-PixelifySans.txt">OFL</a>, <a href="../assets/fonts/OFL-Poppins.txt">OFL</a>). Ícones: <a href="https://simpleicons.org">Simple Icons</a> (CC0); as marcas pertencem aos seus donos.</p>
       <p>OpenSpread e Bullroom têm licença MIT. Um projeto bitcoin100treta. · <a href="../" hreflang="en" lang="en">English</a></p>
     </div>
   </footer>
