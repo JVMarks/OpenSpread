@@ -88,6 +88,8 @@ export interface CoreState {
   machine?: MachineState;
   /** Agenda (datas oficiais + do usuário) e radar de manchetes. Ausente em núcleos antigos. */
   agenda?: AgendaState;
+  /** Motor de paper trading. Ausente quando desligado: tudo aqui é simulado. */
+  engine?: EngineState;
 }
 
 /** "Avise quando o spread líquido do par chegar a X%." Toca uma vez; rearma quando o spread recua. */
@@ -129,6 +131,8 @@ export interface CoreConfig {
   events?: UserEvent[];
   /** Feeds do radar. Ausente = radar desligado. */
   radar?: RadarConfig;
+  /** Motor de paper trading. Ausente = desligado. */
+  engine?: EngineConfig;
 }
 
 export interface ConfigLimits {
@@ -158,6 +162,8 @@ export interface ConfigInfo {
   known: string[];
   /** Quais chaves de dados existem na máquina (só se existem; o valor nunca sai do núcleo). */
   keys?: { birdeye: boolean; blockscout: boolean };
+  /** Valores sugeridos para quem ainda não tem `engine` no config. */
+  engineDefaults?: EngineConfig;
 }
 
 /** Um par numa corretora, na conferência (POST /v1/check). */
@@ -413,4 +419,93 @@ export interface RiskVerdict {
   /** sha256 da operação exata + dia UTC. */
   fingerprint: string;
   checkedAt: number;
+}
+
+/** O motor no config: limites e capital simulado. A IA nunca muda estes valores. */
+export interface EngineConfig {
+  enabled: boolean;
+  policy: RiskPolicy;
+  /** Capital total simulado, em dólar. */
+  totalUsd: number;
+  /** % do total guardada, que nenhum robô usa. */
+  reservePct: number;
+  /** Teto de cada robô, em % do total. */
+  capPct: number;
+  /** Capital mínimo de um robô, em dólar. */
+  minUsd: number;
+  /** Espera entre decidir e ler o livro, em ms. */
+  latencyMs: number;
+  /** Pausa mínima entre operações do mesmo robô, em ms. */
+  cooldownMs: number;
+}
+
+export type EngineBotStatus = 'running' | 'parked' | 'stopped' | 'ejected';
+
+/** Um robô simulado: arbitragem de um par entre duas corretoras, nos dois sentidos. */
+export interface EngineBot {
+  id: string;
+  pair: string;
+  exchanges: [string, string];
+  capitalUsd: number;
+  startedAt: number;
+  status: EngineBotStatus;
+  /** Por que parou. */
+  statusReason?: string;
+  /** Resultado desde que ligou, já com as taxas. */
+  pnlUsd: number;
+  pnlTodayUsd: number;
+  feesUsd: number;
+  trades: number;
+  wins: number;
+  losses: number;
+  /** Maior queda do resultado acumulado desde um pico (positivo). */
+  maxDrawdownUsd: number;
+  /** Saldos simulados: { corretora: { moeda: quantidade } }. */
+  balances: Record<string, Record<string, number>>;
+  /** Leituras do par desde que ligou. */
+  samples: number;
+  /** Quantas dessas leituras ficaram no líquido mínimo ou acima dele. */
+  samplesAbove: number;
+  /** Resultado acumulado depois de cada operação (últimas 60). */
+  series: number[];
+}
+
+/** Uma operação simulada, com as duas pernas. */
+export interface EngineFill {
+  id: string;
+  botId: string;
+  at: number;
+  pair: string;
+  buyOn: string;
+  sellOn: string;
+  /** Quantidade da moeda-base. */
+  base: number;
+  buyAvg: number;
+  sellAvg: number;
+  feesUsd: number;
+  pnlUsd: number;
+  /** Líquido visto ao decidir, em %. */
+  quotedNetPct: number;
+  /** Líquido depois de executar, em %. */
+  realizedNetPct: number;
+  /** O livro não tinha o tamanho pedido. */
+  partial: boolean;
+}
+
+export interface EngineBlock {
+  botId: string;
+  at: number;
+  reasons: RiskReason[];
+}
+
+export interface EngineState {
+  at: number;
+  engine: { kind: 'paper'; ok: boolean; error?: string };
+  mode: 'paper';
+  bots: EngineBot[];
+  /** Últimas operações, mais nova primeiro. */
+  fills: EngineFill[];
+  /** Últimos bloqueios da trava, mais novo primeiro. */
+  blocks: EngineBlock[];
+  latencyMs: number;
 }

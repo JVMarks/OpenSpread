@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import type { AddressInfo } from 'node:net';
 import http from 'node:http';
-import { startServer, type ConfigHandlers } from './server';
+import { startServer, type ConfigHandlers, type EngineHandlers } from './server';
 import { DEFAULT_CONFIG, LIMITS, validateConfig } from './config';
-import type { CoreConfig, CoreState } from './types';
+import type { CoreConfig, CoreState, EngineBot } from './types';
 
 const STATE: CoreState = { rev: 3, at: 1, exchanges: [{ id: 'okx', ok: true, lastAt: 1 }], pairs: [] };
 const BULLROOM = 'http://localhost:5173';
@@ -56,6 +56,85 @@ function rawRequest(base: string, host: string): Promise<number> {
     req.end();
   });
 }
+
+describe('rotas do motor', () => {
+  const BOT = { id: 'bot-1', status: 'running' } as unknown as EngineBot;
+  const handlersEngine = (): EngineHandlers => ({
+    start: (raw) => {
+      const r = raw as { pair?: string };
+      if (!r.pair) return null;
+      if (r.pair === 'X/Y') return { errors: [{ code: 'pair_not_allowed', message: 'm', fix: 'f' }] };
+      return BOT;
+    },
+    stop: (id) => (id === 'bot-1' ? { ...BOT, status: 'stopped' } : undefined),
+  });
+  const startEngine = async (engine?: EngineHandlers) => {
+    server = startServer(() => STATE, { port: 0, allowOrigins: [BULLROOM], engine });
+    await new Promise<void>((r) => server!.once('listening', () => r()));
+    return `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+  };
+  const post = (url: string, body: unknown, headers: Record<string, string> = {}) =>
+    fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', ...headers }, body: JSON.stringify(body) });
+
+  it('sem motor: 404', async () => {
+    const base = await startEngine();
+    expect((await post(`${base}/v1/engine/bots`, {})).status).toBe(404);
+  });
+
+  it('liga: 201 com o robô', async () => {
+    const base = await startEngine(handlersEngine());
+    const r = await post(`${base}/v1/engine/bots`, { pair: 'BTC/USDT' });
+    expect(r.status).toBe(201);
+    expect(await r.json()).toEqual(BOT);
+  });
+
+  it('a trava recusou: 422 com os motivos', async () => {
+    const base = await startEngine(handlersEngine());
+    const r = await post(`${base}/v1/engine/bots`, { pair: 'X/Y' });
+    expect(r.status).toBe(422);
+    expect(await r.json()).toEqual({ error: 'blocked', reasons: [{ code: 'pair_not_allowed', message: 'm', fix: 'f' }] });
+  });
+
+  it('corpo fora do formato: 422; sem JSON: 415', async () => {
+    const base = await startEngine(handlersEngine());
+    expect((await post(`${base}/v1/engine/bots`, {})).status).toBe(422);
+    expect((await fetch(`${base}/v1/engine/bots`, { method: 'POST', body: 'x' })).status).toBe(415);
+  });
+
+  it('para: 200; robô desconhecido: 404; id estranho nem casa com a rota', async () => {
+    const base = await startEngine(handlersEngine());
+    const ok = await post(`${base}/v1/engine/bots/bot-1/stop`, {});
+    expect(ok.status).toBe(200);
+    expect(((await ok.json()) as EngineBot).status).toBe('stopped');
+    expect((await post(`${base}/v1/engine/bots/outro/stop`, {})).status).toBe(404);
+    expect((await post(`${base}/v1/engine/bots/a.b/stop`, {})).status).toBe(404);
+  });
+
+  it('GET não liga nada', async () => {
+    const base = await startEngine(handlersEngine());
+    expect((await fetch(`${base}/v1/engine/bots`)).status).toBe(405);
+  });
+
+  it('Origin de fora: 403; do Bullroom: passa', async () => {
+    const base = await startEngine(handlersEngine());
+    expect((await post(`${base}/v1/engine/bots`, { pair: 'BTC/USDT' }, { Origin: 'https://evil.example' })).status).toBe(403);
+    expect((await post(`${base}/v1/engine/bots`, { pair: 'BTC/USDT' }, { Origin: BULLROOM })).status).toBe(201);
+  });
+
+  it('Host de fora: 403 (contra DNS rebinding)', async () => {
+    const base = await startEngine(handlersEngine());
+    const u = new URL(`${base}/v1/engine/bots`);
+    const status = await new Promise<number>((resolve, reject) => {
+      const req = http.request({ hostname: u.hostname, port: u.port, path: u.pathname, method: 'POST', headers: { Host: 'evil.example', 'Content-Type': 'application/json' } }, (res) => {
+        res.resume();
+        resolve(res.statusCode ?? 0);
+      });
+      req.on('error', reject);
+      req.end('{}');
+    });
+    expect(status).toBe(403);
+  });
+});
 
 describe('servidor local do núcleo', () => {
   it('GET /v1/state devolve o estado; rota desconhecida = 404', async () => {

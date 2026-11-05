@@ -5,7 +5,7 @@
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
 import type { Validation } from './config';
-import type { CheckResult, ConfigInfo, CoreConfig, CoreState } from './types';
+import type { CheckResult, ConfigInfo, CoreConfig, CoreState, EngineBot, RiskReason } from './types';
 
 export const DEFAULT_PORT = 4848;
 const MAX_BODY = 16 * 1024;
@@ -18,6 +18,13 @@ export interface ConfigHandlers {
   save(config: CoreConfig): Promise<void> | void;
 }
 
+/** Ligar e parar robôs simulados (main.ts liga no gerente do motor). */
+export interface EngineHandlers {
+  /** `null` = corpo fora do formato; `errors` = a trava recusou. */
+  start(raw: unknown): EngineBot | { errors: RiskReason[] } | null;
+  stop(id: string): EngineBot | undefined;
+}
+
 export interface ServerOptions {
   port?: number;
   /** Origens que podem ler pelo navegador (o Bullroom). */
@@ -26,7 +33,11 @@ export interface ServerOptions {
   pushMs?: number;
   /** Sem isto, as rotas de configuração respondem 404. */
   config?: ConfigHandlers;
+  /** Sem isto, as rotas do motor respondem 404. */
+  engine?: EngineHandlers;
 }
+
+const STOP_ROUTE = /^\/v1\/engine\/bots\/([A-Za-z0-9_-]{1,64})\/stop$/;
 
 class HttpError extends Error {
   constructor(
@@ -123,6 +134,32 @@ export function startServer(getState: () => CoreState, opts: ServerOptions = {})
     throw new HttpError(405, 'method_not_allowed');
   };
 
+  const handleEngine = async (req: http.IncomingMessage, res: http.ServerResponse, path: string, engine: EngineHandlers) => {
+    guard(req);
+    if (req.method === 'OPTIONS') {
+      res.writeHead(204, { 'Access-Control-Allow-Methods': 'POST', 'Access-Control-Allow-Headers': 'Content-Type', 'Access-Control-Max-Age': '600' });
+      res.end();
+      return;
+    }
+    if (req.method !== 'POST') throw new HttpError(405, 'method_not_allowed');
+    const stop = STOP_ROUTE.exec(path);
+    if (stop) {
+      const bot = engine.stop(stop[1]);
+      if (!bot) throw new HttpError(404, 'bot_not_found');
+      return json(res, 200, bot);
+    }
+    const started = engine.start(await readJson(req));
+    if (started === null) throw new HttpError(422, 'invalid_bot');
+    if ('errors' in started) return json(res, 422, { error: 'blocked', reasons: started.errors });
+    return json(res, 201, started);
+  };
+
+  const fail = (res: http.ServerResponse) => (e: unknown) => {
+    if (res.headersSent) return;
+    if (e instanceof HttpError) json(res, e.status, { error: e.code, ...(e.details ? { details: e.details } : {}) });
+    else json(res, 500, { error: 'internal', details: [(e as Error).message] });
+  };
+
   const server = http.createServer((req, res) => {
     cors(req, res);
     const path = (req.url ?? '').split('?')[0];
@@ -139,11 +176,11 @@ export function startServer(getState: () => CoreState, opts: ServerOptions = {})
       return;
     }
     if (opts.config && (path === '/v1/config' || path === '/v1/check')) {
-      handleConfig(req, res, path, opts.config).catch((e: unknown) => {
-        if (res.headersSent) return;
-        if (e instanceof HttpError) json(res, e.status, { error: e.code, ...(e.details ? { details: e.details } : {}) });
-        else json(res, 500, { error: 'internal', details: [(e as Error).message] });
-      });
+      handleConfig(req, res, path, opts.config).catch(fail(res));
+      return;
+    }
+    if (opts.engine && (path === '/v1/engine/bots' || STOP_ROUTE.test(path))) {
+      handleEngine(req, res, path, opts.engine).catch(fail(res));
       return;
     }
     res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });

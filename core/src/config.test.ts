@@ -2,7 +2,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync, existsSync } from 'no
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { configPath, DEFAULT_CONFIG, LIMITS, loadConfig, saveConfig, validateConfig } from './config';
+import { configPath, DEFAULT_CONFIG, defaultEngineConfig, LIMITS, loadConfig, saveConfig, validateConfig } from './config';
 
 const KNOWN = ['binance', 'okx', 'kraken', 'kucoin'];
 const dirs: string[] = [];
@@ -74,6 +74,72 @@ describe('validateConfig', () => {
     expect(validateConfig([], KNOWN).ok).toBe(false);
     expect(validateConfig({ exchanges: 'binance', pairs: ['BTC/USDT'] }, KNOWN).ok).toBe(false);
     expect(validateConfig({ exchanges: ['binance', 2], pairs: ['BTC/USDT'] }, KNOWN).ok).toBe(false);
+  });
+});
+
+describe('motor no config', () => {
+  const pairs = ['USDC/USDT', 'BTC/USDT'];
+  const engine = () => ({ ...defaultEngineConfig(10_000), enabled: true, policy: { ...defaultEngineConfig(10_000).policy, allowedPairs: ['btc/usdt'] } });
+  const check = (e: unknown) => validateConfig({ exchanges: ['binance', 'okx'], pairs, engine: e }, KNOWN);
+  const errorsOf = (e: unknown) => {
+    const r = check(e);
+    return r.ok ? [] : r.errors;
+  };
+
+  it('sem engine continua válido, e sem o campo', () => {
+    const r = validateConfig({ exchanges: ['binance', 'okx'], pairs }, KNOWN);
+    expect(r.ok && 'engine' in r.config).toBe(false);
+  });
+
+  it('padrão: desligado, sem par permitido, cotação de até duas leituras', () => {
+    expect(defaultEngineConfig(10_000)).toEqual({
+      enabled: false,
+      policy: { maxTradeUsd: 100, minNetPct: 0.05, maxQuoteAgeMs: 20_000, dailyLossLimitUsd: 5, allowedPairs: [] },
+      totalUsd: 1000,
+      reservePct: 20,
+      capPct: 50,
+      minUsd: 50,
+      latencyMs: 1000,
+      cooldownMs: 30_000,
+    });
+  });
+
+  it('válido passa, com o par normalizado', () => {
+    const r = check(engine());
+    expect(r.ok && r.config.engine?.policy.allowedPairs).toEqual(['BTC/USDT']);
+  });
+
+  it('o padrão passa pela própria validação (sem par permitido)', () => {
+    expect(check(defaultEngineConfig(10_000)).ok).toBe(true);
+  });
+
+  it('recusa campo desconhecido, inclusive dentro da política', () => {
+    expect(errorsOf({ ...engine(), chave: 'x' }).join()).toContain('chave');
+    expect(errorsOf({ ...engine(), policy: { ...engine().policy, segredo: 1 } }).join()).toContain('segredo');
+  });
+
+  it.each([
+    ['capPct acima de 100', { capPct: 101 }, 'capPct'],
+    ['capPct zero', { capPct: 0 }, 'capPct'],
+    ['latência fora da faixa', { latencyMs: 10_001 }, 'latencyMs'],
+    ['latência negativa', { latencyMs: -1 }, 'latencyMs'],
+    ['capital zero', { totalUsd: 0 }, 'totalUsd'],
+    ['reserva acima de 100', { reservePct: 101 }, 'reservePct'],
+    ['enabled sem ser booleano', { enabled: 'sim' }, 'enabled'],
+    ['política ausente', { policy: undefined }, 'policy'],
+  ])('recusa %s', (_nome, patch, campo) => {
+    expect(errorsOf({ ...engine(), ...patch }).join()).toContain(campo);
+  });
+
+  it.each([
+    ['limite de perda negativo', { dailyLossLimitUsd: -5 }, 'dailyLossLimitUsd'],
+    ['limite de perda zero', { dailyLossLimitUsd: 0 }, 'dailyLossLimitUsd'],
+    ['líquido mínimo negativo', { minNetPct: -0.1 }, 'minNetPct'],
+    ['operação zero', { maxTradeUsd: 0 }, 'maxTradeUsd'],
+    ['limite ausente', { maxQuoteAgeMs: undefined }, 'maxQuoteAgeMs'],
+    ['par fora da lista', { allowedPairs: ['ETH/USDT'] }, 'ETH/USDT'],
+  ])('recusa na política: %s', (_nome, patch, campo) => {
+    expect(errorsOf({ ...engine(), policy: { ...engine().policy, ...patch } }).join()).toContain(campo);
   });
 });
 

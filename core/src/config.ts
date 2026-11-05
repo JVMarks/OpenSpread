@@ -4,7 +4,7 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from '
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { normalizeAddress } from './wallets/address';
-import type { AgendaImpact, ConfigLimits, CoreConfig, DiscoveryConfig, RadarConfig, SpreadAlert, TransferConfig, UserEvent, WalletChain, WalletRef } from './types';
+import type { AgendaImpact, ConfigLimits, CoreConfig, DiscoveryConfig, EngineConfig, RadarConfig, SpreadAlert, TransferConfig, UserEvent, WalletChain, WalletRef } from './types';
 
 export const DEFAULT_CONFIG: Readonly<CoreConfig> = Object.freeze({
   exchanges: ['binance', 'okx', 'bybit', 'kraken', 'coinbaseexchange'],
@@ -37,7 +37,23 @@ const MAX_FEE = 1_000_000;
 const MAX_FEE_ENTRIES = 200;
 const ASSET = /^[A-Z0-9]{2,12}$/;
 
-const FIELDS = new Set(['exchanges', 'pairs', 'pollMs', 'alerts', 'transfer', 'wallets', 'discovery', 'events', 'radar']);
+const FIELDS = new Set(['exchanges', 'pairs', 'pollMs', 'alerts', 'transfer', 'wallets', 'discovery', 'events', 'radar', 'engine']);
+const ENGINE_FIELDS = new Set(['enabled', 'policy', 'totalUsd', 'reservePct', 'capPct', 'minUsd', 'latencyMs', 'cooldownMs']);
+const POLICY_FIELDS = new Set(['maxTradeUsd', 'minNetPct', 'maxQuoteAgeMs', 'dailyLossLimitUsd', 'allowedPairs']);
+
+/** Valores sugeridos do motor: desligado, sem par permitido, cotação de até duas leituras. */
+export function defaultEngineConfig(pollMs: number): EngineConfig {
+  return {
+    enabled: false,
+    policy: { maxTradeUsd: 100, minNetPct: 0.05, maxQuoteAgeMs: 2 * pollMs, dailyLossLimitUsd: 5, allowedPairs: [] },
+    totalUsd: 1_000,
+    reservePct: 20,
+    capPct: 50,
+    minUsd: 50,
+    latencyMs: 1_000,
+    cooldownMs: 30_000,
+  };
+}
 const EVENT_FIELDS = new Set(['title', 'at', 'impact', 'pairs']);
 const RADAR_FIELDS = new Set(['feeds', 'keywords']);
 const IMPACTS: readonly AgendaImpact[] = ['high', 'medium', 'low'];
@@ -119,10 +135,70 @@ export function validateConfig(raw: unknown, known: readonly string[]): Validati
   const discovery = validateDiscovery(r.discovery, errors);
   const events = validateEvents(r.events, pairs, errors);
   const radar = validateRadar(r.radar, errors);
+  const engine = validateEngine(r.engine, pairs, errors);
 
   return errors.length
     ? { ok: false, errors }
-    : { ok: true, config: { exchanges, pairs, pollMs, alerts, transfer, wallets, ...(discovery ? { discovery } : {}), ...(events ? { events } : {}), ...(radar ? { radar } : {}) } };
+    : { ok: true, config: { exchanges, pairs, pollMs, alerts, transfer, wallets, ...(discovery ? { discovery } : {}), ...(events ? { events } : {}), ...(radar ? { radar } : {}), ...(engine ? { engine } : {}) } };
+}
+
+/** `engine` ausente = motor desligado. Todos os limites são obrigatórios: nada de limite implícito numa trava de risco. */
+function validateEngine(raw: unknown, pairs: readonly string[], errors: string[]): EngineConfig | undefined {
+  if (raw === undefined) return undefined;
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    errors.push('"engine" precisa ser um objeto');
+    return undefined;
+  }
+  const e = raw as Record<string, unknown>;
+  const extra = Object.keys(e).filter((k) => !ENGINE_FIELDS.has(k));
+  if (extra.length) errors.push(`campo desconhecido em engine: ${extra.join(', ')}`);
+  const p = (e.policy && typeof e.policy === 'object' && !Array.isArray(e.policy) ? e.policy : null) as Record<string, unknown> | null;
+  if (!p) {
+    errors.push('"engine.policy" precisa ser um objeto');
+    return undefined;
+  }
+  const extraP = Object.keys(p).filter((k) => !POLICY_FIELDS.has(k));
+  if (extraP.length) errors.push(`campo desconhecido em engine.policy: ${extraP.join(', ')}`);
+
+  const num = (from: Record<string, unknown>, field: string, min: number, max: number, integer = false): number => {
+    const v = from[field];
+    if (typeof v !== 'number' || !Number.isFinite(v) || v < min || v > max || (integer && !Number.isInteger(v))) {
+      errors.push(`"${field}" do motor precisa ser ${integer ? 'um inteiro' : 'um número'} entre ${min} e ${max}`);
+      return min;
+    }
+    return v;
+  };
+  const positive = (from: Record<string, unknown>, field: string, max: number): number => {
+    const v = num(from, field, 0, max);
+    if (v === 0) errors.push(`"${field}" do motor precisa ser maior que zero`);
+    return v;
+  };
+
+  if (typeof e.enabled !== 'boolean') errors.push('"engine.enabled" precisa ser verdadeiro ou falso');
+  const allowed = p.allowedPairs;
+  let allowedPairs: string[] = [];
+  if (!Array.isArray(allowed) || !allowed.every((x) => typeof x === 'string')) errors.push('"allowedPairs" precisa ser uma lista de pares');
+  else {
+    allowedPairs = [...new Set(allowed.map((x) => x.trim().toUpperCase()))];
+    const out = allowedPairs.filter((x) => !pairs.includes(x));
+    if (out.length) errors.push(`par permitido fora da lista de pares: ${out.join(', ')}`);
+  }
+  return {
+    enabled: e.enabled === true,
+    policy: {
+      maxTradeUsd: positive(p, 'maxTradeUsd', LIMITS.maxSizeUsd),
+      minNetPct: num(p, 'minNetPct', 0, LIMITS.maxAlertPct),
+      maxQuoteAgeMs: num(p, 'maxQuoteAgeMs', 1_000, 600_000, true),
+      dailyLossLimitUsd: positive(p, 'dailyLossLimitUsd', LIMITS.maxSizeUsd),
+      allowedPairs,
+    },
+    totalUsd: positive(e, 'totalUsd', 1_000_000_000),
+    reservePct: num(e, 'reservePct', 0, 100),
+    capPct: positive(e, 'capPct', 100),
+    minUsd: num(e, 'minUsd', 0, LIMITS.maxSizeUsd),
+    latencyMs: num(e, 'latencyMs', 0, 10_000, true),
+    cooldownMs: num(e, 'cooldownMs', 0, 3_600_000, true),
+  };
 }
 
 /** `transfer` ausente = padrão (US$ 1.000, nenhuma taxa). Corretora precisa existir na CCXT; moeda em maiúsculas. */

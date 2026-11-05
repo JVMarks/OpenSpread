@@ -3,6 +3,32 @@ import { Poller, type ExchangeLike } from './poller';
 
 const NOW = 1_760_000_000_000;
 
+describe('mensagem de erro da corretora', () => {
+  const failing = (error: Error): ExchangeLike => ({ loadMarkets: () => Promise.reject(error), fetchTicker: async () => ({}) });
+
+  it('erro de rede com mensagem vazia mostra o código, em vez de "sem dados ()"', async () => {
+    const error = Object.assign(new AggregateError([], ''), { code: 'EACCES' });
+    const logs: string[] = [];
+    const p = new Poller(['x'], ['USDC/USDT'], { create: () => failing(error), log: (m) => logs.push(m) });
+    await p.pollOnce(1);
+    expect(p.state(1).exchanges[0].error).toBe('EACCES');
+    expect(logs).toEqual(['x: sem dados (EACCES)']);
+  });
+
+  it('sem mensagem nem código, ainda diz o tipo do erro', async () => {
+    const p = new Poller(['x'], ['USDC/USDT'], { create: () => failing(new TypeError('')) });
+    await p.pollOnce(1);
+    expect(p.state(1).exchanges[0].error).toBe('TypeError');
+  });
+
+  it('a conferência usa a mesma mensagem', async () => {
+    const error = Object.assign(new AggregateError([], ''), { code: 'EACCES' });
+    const p = new Poller(['x'], ['USDC/USDT'], { create: () => failing(error) });
+    const r = await p.check(['x'], ['USDC/USDT'], 1);
+    expect(r.exchanges[0].error).toBe('EACCES');
+  });
+});
+
 describe('livro de ofertas', () => {
   const USDC = { 'USDC/USDT': { active: true, taker: 0.001, limits: { cost: { min: 5 } } } };
   const USDT = { 'USDT/USDC': { active: true, taker: 0.001 } };

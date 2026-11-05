@@ -5,7 +5,10 @@ import { SpreadAlerts } from './alerts';
 import { applyTransfer } from './transfer';
 import { SpreadHistory } from './history';
 import { dirname, join } from 'node:path';
-import { configPath, LIMITS, loadConfig, saveConfig, validateConfig } from './config';
+import { configPath, defaultEngineConfig, LIMITS, loadConfig, saveConfig, validateConfig } from './config';
+import { Ledger } from './engine/ledger';
+import { EngineManager, parseBotRequest } from './engine/manager';
+import { PaperEngine } from './engine/paper';
 import { Poller } from './poller';
 import { DEFAULT_PORT, startServer } from './server';
 import { loadKeys } from './keys';
@@ -103,13 +106,26 @@ void radarTick();
 
 const poller = new Poller(config.exchanges, config.pairs, { log, onRequest: (id, ms) => usage.record(id, Date.now(), ms) });
 const alerts = new SpreadAlerts();
+// Motor de paper: só dados públicos e saldo simulado. Ligado e limitado só pelo config do usuário.
+const engineDir = join(dirname(file), 'engine');
+const paper = new PaperEngine((exchange, pair) => poller.fetchBook(exchange, pair), { get latencyMs() { return config.engine?.latencyMs ?? 0; } });
+const engine = new EngineManager(paper, {
+  file: join(engineDir, 'bots.json'),
+  ledger: new Ledger(join(engineDir, 'ledger.jsonl'), log),
+  config: () => config.engine,
+  minOrderUsd: (exchange, pair) => poller.minOrderUsd(exchange, pair),
+  log,
+});
+engine.load();
+log(engine.enabled() ? `motor de paper ligado (simulado, sem ordem real): ${config.engine?.policy.allowedPairs.length ?? 0} par(es) permitido(s)` : 'motor de paper desligado');
 /** Estado servido: o do Poller com o custo de transferência da configuração em cada melhor spread. */
 const history = new SpreadHistory();
 const historyFile = join(dirname(file), 'history.json');
 history.load(historyFile, Date.now());
 const current = (): CoreState => {
   const s = poller.state();
-  const out: CoreState = { ...s, rev: s.rev + watcher.rev + agenda.rev, pairs: history.apply(applyTransfer(s.pairs, config.transfer), s.at) };
+  const out: CoreState = { ...s, rev: s.rev + watcher.rev + agenda.rev + engine.rev, pairs: history.apply(applyTransfer(s.pairs, config.transfer), s.at) };
+  if (engine.enabled()) out.engine = engine.state(s.at);
   if (watcher.hasWallets()) out.wallets = watcher.state(s.at);
   out.agenda = agenda.state(config, s.at);
   out.machine = machineState({ now: s.at, cpuPct: cpu.sample(), exchanges: s.exchanges, rateLimits: poller.rateLimits(), chains: out.wallets?.sources ?? [], feeds: out.agenda.feeds, usage });
@@ -122,11 +138,15 @@ const saveHistory = () => {
     log(`não consegui salvar o histórico em ${historyFile}: ${(e as Error).message}`);
   }
 };
-setInterval(saveHistory, 5 * 60_000).unref();
+setInterval(() => {
+  saveHistory();
+  if (engine.enabled()) engine.save();
+}, 5 * 60_000).unref();
 for (const sig of ['SIGINT', 'SIGTERM'] as const) {
   process.on(sig, () => {
     saveHistory();
     watcher.saveCache();
+    engine.save();
     process.exit(0);
   });
 }
@@ -140,6 +160,7 @@ const tick = async () => {
     await poller.pollOnce();
     const s = current();
     history.record(s.pairs, s.at);
+    engine.evaluate(s);
     for (const e of alerts.evaluate(config.alerts, s.pairs, s.at)) {
       log(`alerta: ${e.pair} com spread líquido de ${e.netPct.toFixed(3)}% (nível ${e.abovePct}%), ${e.buyOn} → ${e.sellOn}`);
     }
@@ -153,7 +174,7 @@ const server = startServer(() => ({ ...current(), alerts: alerts.events() }), {
   port,
   allowOrigins: ORIGINS,
   config: {
-    info: () => ({ config, limits: { ...LIMITS }, known: [...KNOWN], keys: { birdeye: !!keys.birdeye, blockscout: !!keys.blockscout } }),
+    info: () => ({ config, limits: { ...LIMITS }, known: [...KNOWN], keys: { birdeye: !!keys.birdeye, blockscout: !!keys.blockscout }, engineDefaults: defaultEngineConfig(config.pollMs) }),
     validate: (raw) => validateConfig(raw, KNOWN),
     check: (c) => poller.check(c.exchanges, c.pairs),
     save: (next) => {
@@ -171,6 +192,13 @@ const server = startServer(() => ({ ...current(), alerts: alerts.events() }), {
       else void watchTick();
       log(`configuração salva: ${next.exchanges.length} corretoras, ${next.pairs.length} pares, ${next.alerts.length} alertas, ${next.wallets?.length ?? 0} carteiras, a cada ${next.pollMs / 1000} s`);
     },
+  },
+  engine: {
+    start: (raw) => {
+      const req = parseBotRequest(raw);
+      return req && engine.startBot(req);
+    },
+    stop: (id) => engine.stopBot(id),
   },
 });
 server.on('listening', () => log(`OpenSpread core em http://127.0.0.1:${port} (dados públicos de mercado; sem chave, sem ordem)`));

@@ -30,6 +30,13 @@ export interface PollerOptions {
 
 const invert = (pair: string): string => pair.split('/').reverse().join('/');
 
+/** Texto curto de um erro. Erro de conexão do Node pode vir com mensagem vazia (AggregateError): aí vale o código ou o tipo. */
+function errorText(e: unknown): string {
+  if (!(e instanceof Error)) return String(e);
+  const text = e.message || (e as Error & { code?: string }).code || e.name;
+  return text.replace(/\s+/g, ' ').slice(0, 160);
+}
+
 /** Rejeita se a promessa não resolver a tempo; o cronômetro é sempre cancelado. */
 function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
   let timer: NodeJS.Timeout | undefined;
@@ -86,8 +93,7 @@ export class Poller {
         });
         return { id, ok: true, listings };
       } catch (e) {
-        const error = (e instanceof Error ? e.message : String(e)).replace(/\s+/g, ' ').slice(0, 160);
-        return { id, ok: false, error, listings: pairs.map(empty) };
+        return { id, ok: false, error: errorText(e), listings: pairs.map(empty) };
       }
     };
     return { at: now, exchanges: await Promise.all(ids.map(one)) };
@@ -145,8 +151,7 @@ export class Poller {
       }
       this.setStatus({ id, ok: true, lastAt: now });
     } catch (e) {
-      const msg = (e instanceof Error ? e.message : String(e)).replace(/\s+/g, ' ').slice(0, 160);
-      this.setStatus({ id, ok: false, error: msg, lastAt: this.status.get(id)?.lastAt });
+      this.setStatus({ id, ok: false, error: errorText(e), lastAt: this.status.get(id)?.lastAt });
     }
     this.rev++;
   }
