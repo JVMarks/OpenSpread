@@ -508,4 +508,6 @@ export interface EngineState {
   /** Últimos bloqueios da trava, mais novo primeiro. */
   blocks: EngineBlock[];
   latencyMs: number;
+  /** Perda diária máxima por robô, da política. */
+  dailyLossLimitUsd: number;
 }

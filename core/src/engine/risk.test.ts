@@ -8,6 +8,15 @@ const POLICY: RiskPolicy = { maxTradeUsd: 100, minNetPct: 0.05, maxQuoteAgeMs: 1
 
 const TRADE: ProposedTrade = { botId: 'bot-1', pair: 'BTC/USDT', buyOn: 'binance', sellOn: 'kraken', sizeUsd: 60, netPct: 0.1, mode: 'paper' };
 
+it('motivo de saldo com número legível, sem o ruído do ponto flutuante', () => {
+  const reasons = checkTrade(
+    { ...TRADE, sellOn: 'c', buyOn: 'a', sizeUsd: 49.6781234 },
+    { now: NOW, balances: { a: { USDT: 0.2720323637064155 }, c: { BTC: 1 } }, priceUsd: { USDT: 1, BTC: 100 }, quoteAt: { a: NOW, c: NOW }, exchangeOk: { a: true, c: true }, minOrderUsd: {}, pnlTodayUsd: 0 },
+    POLICY,
+  ).reasons;
+  expect(reasons.find((r) => r.code === 'no_balance_buy')?.message).toBe('Saldo de USDT em a (0.272) não cobre US$ 49.68.');
+});
+
 const ctx = (over: Partial<RiskContext> = {}): RiskContext => ({
   now: NOW,
   balances: { binance: { USDT: 100, BTC: 0 }, kraken: { USDT: 0, BTC: 0.002 } },

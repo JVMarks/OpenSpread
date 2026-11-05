@@ -79,7 +79,7 @@ export function checkTrade(t: ProposedTrade, ctx: RiskContext, policy: RiskPolic
         return;
       }
       const have = ctx.balances[exchange]?.[asset as string] ?? 0;
-      if (have * price < t.sizeUsd) block(code, `Saldo de ${asset} em ${exchange} (${have}) não cobre US$ ${t.sizeUsd}.`, 'Robô parado até haver saldo nessa corretora.');
+      if (have * price < t.sizeUsd) block(code, `Saldo de ${asset} em ${exchange} (${Number(have.toPrecision(4))}) não cobre US$ ${Math.round(t.sizeUsd * 100) / 100}.`, 'Robô parado até haver saldo nessa corretora.');
     };
     leg(quote, t.buyOn, 'no_balance_buy');
     leg(base, t.sellOn, 'no_balance_sell');

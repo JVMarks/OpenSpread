@@ -159,6 +159,7 @@ export class EngineManager {
       fills: this.fills,
       blocks: this.blocks,
       latencyMs: this.opts.config()?.latencyMs ?? 0,
+      dailyLossLimitUsd: this.opts.config()?.policy.dailyLossLimitUsd ?? 0,
     };
   }
 
