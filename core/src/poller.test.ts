@@ -3,6 +3,61 @@ import { Poller, type ExchangeLike } from './poller';
 
 const NOW = 1_760_000_000_000;
 
+describe('livro de ofertas', () => {
+  const USDC = { 'USDC/USDT': { active: true, taker: 0.001, limits: { cost: { min: 5 } } } };
+  const USDT = { 'USDT/USDC': { active: true, taker: 0.001 } };
+  const book = { bids: [[0.5, 10]] as [number, number][], asks: [[0.8, 10]] as [number, number][] };
+  const make = (markets: Record<string, { active?: boolean; taker?: number }>, withBook = true): ExchangeLike => ({
+    loadMarkets: async () => markets,
+    fetchTicker: async () => ({ bid: 1, ask: 1.001 }),
+    ...(withBook ? { fetchOrderBook: async () => book } : {}),
+  });
+  const pollerFor = (ex: ExchangeLike, seen: string[] = []) =>
+    new Poller(['x'], ['USDC/USDT'], { create: () => ex, onRequest: (id) => seen.push(id) });
+
+  it('par listado direto: volta como veio', async () => {
+    const p = pollerFor(make(USDC));
+    await p.pollOnce(1);
+    expect(await p.fetchBook('x', 'USDC/USDT')).toEqual(book);
+  });
+
+  it('par listado ao contrário: volta no sentido do OpenSpread', async () => {
+    const p = pollerFor(make(USDT));
+    await p.pollOnce(1);
+    expect(await p.fetchBook('x', 'USDC/USDT')).toEqual({ bids: [[1.25, 8]], asks: [[2, 5]] });
+  });
+
+  it('o pedido conta na sala de máquinas', async () => {
+    const seen: string[] = [];
+    const p = pollerFor(make(USDC), seen);
+    await p.pollOnce(1);
+    const before = seen.length;
+    await p.fetchBook('x', 'USDC/USDT');
+    expect(seen.length).toBe(before + 1);
+  });
+
+  it('corretora sem fetchOrderBook: erro claro', async () => {
+    const p = pollerFor(make(USDC, false));
+    await p.pollOnce(1);
+    await expect(p.fetchBook('x', 'USDC/USDT')).rejects.toThrow(/livro/);
+  });
+
+  it('par que a corretora não lista: erro claro', async () => {
+    const p = pollerFor(make(USDC));
+    await p.pollOnce(1);
+    await expect(p.fetchBook('x', 'BTC/USDT')).rejects.toThrow(/BTC\/USDT/);
+  });
+
+  it('mínimo de ordem vem de limits.cost.min; sem informação fica indefinido', async () => {
+    const a = pollerFor(make(USDC));
+    await a.pollOnce(1);
+    expect(a.minOrderUsd('x', 'USDC/USDT')).toBe(5);
+    const b = pollerFor(make(USDT));
+    await b.pollOnce(1);
+    expect(b.minOrderUsd('x', 'USDC/USDT')).toBeUndefined();
+  });
+});
+
 /** Corretora falsa: mercados fixos e tickers fixos; `fail` faz o fetchTicker lançar. */
 function fake(markets: Record<string, { active?: boolean; taker?: number }>, tickers: Record<string, { bid: number; ask: number }>, fail?: string): ExchangeLike {
   return {

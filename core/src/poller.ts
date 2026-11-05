@@ -1,6 +1,7 @@
 // Busca as cotações públicas nas corretoras (CCXT) e monta o estado do núcleo. Sem chave, sem ordem.
 // Uma corretora com erro (fora do ar, bloqueada no país) não derruba as outras; o log só registra mudança de estado.
 import ccxt from 'ccxt';
+import { invertBook, type Book } from './engine/book';
 import { bestOpportunity, freshQuotes, MAX_QUOTE_AGE_MS, normalizeQuote } from './spread';
 import type { CheckResult, CoreState, ExchangeStatus, Listing, Quote } from './types';
 
@@ -8,9 +9,14 @@ import type { CheckResult, CoreState, ExchangeStatus, Listing, Quote } from './t
 export interface ExchangeLike {
   /** Ms entre pedidos que a CCXT respeita (ausente nas corretoras falsas dos testes). */
   rateLimit?: number;
-  loadMarkets(): Promise<Record<string, { active?: boolean; taker?: number }>>;
+  loadMarkets(): Promise<Record<string, { active?: boolean; taker?: number; limits?: { cost?: { min?: number } } }>>;
   fetchTicker(symbol: string): Promise<{ bid?: number; ask?: number; timestamp?: number }>;
+  /** Só o motor de paper usa, e só quando há oportunidade. */
+  fetchOrderBook?(symbol: string): Promise<Book>;
 }
+
+/** Tempo-limite de um livro: uma execução simulada não pode ficar pendurada numa corretora lenta. */
+const BOOK_TIMEOUT_MS = 10_000;
 
 export interface PollerOptions {
   create?: (id: string) => ExchangeLike;
@@ -43,7 +49,7 @@ export function createCcxtExchange(id: string): ExchangeLike {
 export class Poller {
   private exchanges = new Map<string, ExchangeLike>();
   /** Por corretora: par do OpenSpread → símbolo na corretora (direto ou invertido) e taxa taker. */
-  private symbols = new Map<string, Map<string, { symbol: string; taker: number }>>();
+  private symbols = new Map<string, Map<string, { symbol: string; taker: number; minCost?: number }>>();
   private quotes = new Map<string, Quote>();
   private status = new Map<string, ExchangeStatus>();
   private rev = 0;
@@ -118,12 +124,12 @@ export class Poller {
       const ex = this.exchange(id);
       if (!this.symbols.has(id)) {
         const markets = await this.timed(id, () => ex.loadMarkets());
-        const map = new Map<string, { symbol: string; taker: number }>();
+        const map = new Map<string, { symbol: string; taker: number; minCost?: number }>();
         for (const pair of this.pairs) {
           for (const symbol of [pair, invert(pair)]) {
             const m = markets[symbol];
             if (m && m.active !== false) {
-              map.set(pair, { symbol, taker: m.taker ?? 0 });
+              map.set(pair, { symbol, taker: m.taker ?? 0, minCost: m.limits?.cost?.min });
               break;
             }
           }
@@ -143,6 +149,23 @@ export class Poller {
       this.setStatus({ id, ok: false, error: msg, lastAt: this.status.get(id)?.lastAt });
     }
     this.rev++;
+  }
+
+  /** Livro público de um par, sempre no sentido do OpenSpread. O pedido conta na sala de máquinas. */
+  async fetchBook(exchange: string, pair: string): Promise<Book> {
+    const listed = this.symbols.get(exchange)?.get(pair);
+    if (!listed) throw new Error(`${exchange} não lista ${pair}`);
+    const ex = this.exchange(exchange);
+    if (!ex.fetchOrderBook) throw new Error(`${exchange} não informa o livro de ofertas`);
+    const fetch = ex.fetchOrderBook.bind(ex);
+    const book = await this.timed(exchange, () => withTimeout(fetch(listed.symbol), BOOK_TIMEOUT_MS));
+    return listed.symbol === pair ? book : invertBook(book);
+  }
+
+  /** Ordem mínima na moeda de cotação, quando a corretora informa. Par listado ao contrário: o limite é na outra moeda, então fica sem informação. */
+  minOrderUsd(exchange: string, pair: string): number | undefined {
+    const listed = this.symbols.get(exchange)?.get(pair);
+    return listed?.symbol === pair ? listed.minCost : undefined;
   }
 
   /** ms entre pedidos de cada corretora (CCXT). */
