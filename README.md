@@ -19,6 +19,8 @@ design and test bots. No server of ours, no tracking. *A bitcoin100treta project
   for stablecoin pairs (exchanges and pairs are configurable, see below), computes the best cross-exchange **net spread** (after both taker fees; transfer costs not
   included) and serves it on `127.0.0.1:4848` (`/v1/state`, `/v1/stream` as SSE).
 - [Bullroom](https://github.com/JVMarks/bullroom) shows it live: one room per pair, one character per exchange.
+- **Built-in paper trading** (off by default, nothing extra to install): arbitrage robots simulated on real public order
+  books, with no keys and no real orders. See below.
 
 ## Run it
 
@@ -103,10 +105,43 @@ run `node scripts/sync-demo.mjs`.
 - **The AI proposes, the engine executes,** inside a risk policy you set.
 - **Honest numbers.** Negative net spread is shown as negative. Simulated data is always labeled.
 
+## Paper trading
+
+Turn it on in Bullroom (**Settings › Robots**) or with an `engine` block in the config. It starts off, with no pair allowed.
+
+For each robot (one pair, two exchanges), every reading works like this:
+
+1. If the best net spread reaches your minimum, the trade goes through a **risk gate**: allowed pair, trade size, quote age,
+   exchange health, minimum order, balance on each exchange and daily loss. The gate blocks it and says why, or lets it pass.
+2. The engine waits a configurable latency (1 s by default), reads both public order books and walks them for the size it can
+   fill on both legs. If the opportunity vanished during the wait, that shows up as a **loss**, not as a cancelled trade.
+3. Fees, balances and P&L update. Robots run on pretend capital (US$ 1,000 by default, with a 20% reserve and a 50% cap per
+   robot). Every decision is appended to `engine/ledger.jsonl`, next to the config.
+
+Limits come only from your config; nothing here changes them. A robot that hits the daily loss limit is ejected until the next
+UTC day.
+
+**What this does not tell you:**
+
+- **Paper trading does not guarantee real results.** There is no queue, no order rejection and no failure of just one leg: both
+  legs always fill together.
+- **Without transfers, a robot runs out of balance fast.** It starts with a quarter of its capital in each coin on each exchange,
+  so a one-way spread stops it after a trade or two, until the spread flips. Rebalancing is not simulated.
+- **Real opportunities are rare.** On 4 Nov 2026, 16 exchange combinations across 1,227 USDT pairs had a positive net spread, almost
+  all altcoins. A large spread that lasts can mean suspended withdrawals or different tokens sharing a symbol. It is not free money.
+- **No arbitrage backtest.** That takes historical order books, which we do not have, so we show no number. Bullroom shows the
+  best net spread of the last 24 h and how many readings reached your minimum instead.
+- **Fees are public taker fees,** not your account's. An exchange that does not report a fee blocks the trade.
+
+The risk gate, capital split and ledger take ideas from [trader-skill](https://github.com/Jakeschincariol/trader-skill) (MIT),
+rewritten here.
+
+This is software, not investment advice.
+
 ## Roadmap
 
-Paper trading and backtests with Hummingbot → MCP so your own Claude/Codex can design strategies → real orders behind
-a risk policy → Nostr for identity, signed analyses and donations.
+MCP so your own Claude/Codex can design strategies → real orders with Hummingbot behind the same risk gate → Nostr for identity,
+signed analyses and donations.
 
 ## Support
 
