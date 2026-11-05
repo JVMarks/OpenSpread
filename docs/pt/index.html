@@ -33,6 +33,7 @@
         <a href="#video">Vídeo</a>
         <a href="#sala">A sala</a>
         <a href="#ferramentas">Ferramentas</a>
+        <a href="#paper">Paper</a>
         <a href="#rodar">Como rodar</a>
         <a href="#roteiro">Roteiro</a>
         <a href="https://github.com/JVMarks/OpenSpread">GitHub</a>
@@ -53,6 +54,7 @@
         <li data-key="CORRETORAS" data-color="green" data-cap="&lt;b&gt;BINANCE · OKX · BYBIT · KRAKEN · COINBASE&lt;/b&gt; · SÓ LEITURA">5 AO VIVO</li>
         <li data-key="TAXAS" data-color="amber" data-cap="&lt;b&gt;CADA LADO COBRA&lt;/b&gt; · A PLACA DESCONTA AS DUAS">TAXA+TAXA</li>
         <li data-key="ALERTA" data-color="green" data-cap="&lt;b&gt;ALERTA DE SPREAD&lt;/b&gt; · TOCA UMA VEZ NO SEU NÍVEL E REARMA ABAIXO DELE">≥0,05%</li>
+        <li data-key="PAPER" data-color="amber" data-cap="&lt;b&gt;ROBÔS SOBRE O LIVRO REAL&lt;/b&gt; · SEM CHAVE E SEM ORDEM REAL">SIMULADO</li>
       </ol>
     </div>
     <div class="wrap hero-copy">
@@ -149,9 +151,10 @@
               <ul>
                 <li>Lê os preços públicos da Binance, OKX, Bybit, Kraken e Coinbase.</li>
                 <li>Mostra o spread líquido, já sem a taxa de compra e a de venda. Negativo continua negativo.</li>
-                <li><span class="pill amber">NOVO</span>Suas corretoras e pares num arquivo local, <code>~/.openspread/config.json</code>.</li>
-                <li><span class="pill amber">NOVO</span>Alertas de spread que tocam uma vez e rearmam, sem ficar piscando.</li>
-                <li>Serve tudo em <code>127.0.0.1</code>. Nada sai da sua máquina.</li>
+                <li>Suas corretoras e pares num arquivo local, <code>~/.openspread/config.json</code>.</li>
+                <li>Alertas de spread que tocam uma vez e rearmam, sem ficar piscando.</li>
+                <li><span class="pill amber">NOVO</span>Paper trading embutido, com trava de risco a cada oportunidade.</li>
+                <li>Serve tudo em <code>127.0.0.1</code>, sem servidor nosso: só faz pedidos públicos a corretoras, redes e os feeds que você escolher.</li>
               </ul>
               <div class="actions"><a class="btn ghost" href="https://github.com/JVMarks/OpenSpread">OpenSpread no GitHub</a></div>
             </div>
@@ -164,8 +167,9 @@
               <ul>
                 <li>Sentado está posicionado; circulando está zerado.</li>
                 <li>O PL flutua sobre cada cabeça; a placa soma a sala.</li>
-                <li><span class="pill amber">NOVO</span>Painel Mercados: escolha corretoras e pares, e crie alertas, de dentro da sala.</li>
+                <li>Painel Mercados: escolha corretoras e pares, e crie alertas, de dentro da sala.</li>
                 <li>O robô que bate o limite de perda do dia é ejetado da sala.</li>
+                <li><span class="pill amber">NOVO</span>Sala de simulação e painel Robôs: ligue, pare e veja o motivo de cada parada.</li>
                 <li>Simulado no navegador, ou ao vivo com o OpenSpread.</li>
               </ul>
               <div class="actions">
@@ -178,10 +182,41 @@
       </div>
     </section>
 
+    <section class="block" id="paper" aria-labelledby="paper-h">
+      <div class="wrap">
+        <div class="head">
+          <div class="kicker"><i>05</i> PAPER TRADING</div>
+          <h2 id="paper-h">Simule. A conta continua honesta.</h2>
+          <p class="sub">Robôs de arbitragem sobre o livro de ofertas real, com trava de risco e saldo de mentira. Sem chave, sem ordem real, nada para instalar além do núcleo.</p>
+        </div>
+        <div class="paper-main">
+          <figure class="paper-shot">
+            <img src="../assets/img/paper-room-pt-BR.webp" alt="Sala de simulação do Bullroom, roxa, com a placa SIMULATED, o telão com o resultado e três robôs nas mesas" width="1030" height="784" loading="lazy">
+            <figcaption>Todos os robôs ficam numa sala roxa só, com o selo SIMULATED. O resultado simulado nunca soma com o spread real.</figcaption>
+          </figure>
+          <div>
+            <div class="paper-nums">
+              <div class="paper-num" data-tilt><strong>1,09% <i>→</i> <em>1,01%</em></strong><span>Cotado contra realizado: quanto do spread sobrou depois de caminhar pelo livro.</span></div>
+              <div class="paper-num" data-tilt><strong class="neg">0 de 178</strong><span>Leituras de BTC/USDT acima do mínimo. Robô quieto ali é resultado, não defeito.</span></div>
+              <div class="paper-num" data-tilt><strong class="pos">16 de 1.227</strong><span>Combinações de pares em USDT com líquido positivo numa varredura de 5 corretoras. Spread alto pode ser saque suspenso.</span></div>
+            </div>
+            <p class="hint">Exemplos de 04/11/2026. Paper trading não garante resultado real. Sem backtest de arbitragem, e a falha de uma perna só não é simulada.</p>
+          </div>
+        </div>
+        <h3 class="paper-also">Também no Bullroom</h3>
+        <div class="paper-strip">
+          <article class="paper-mini" data-tilt><img src="../assets/img/wallets-pt-BR.webp" alt="" width="620" height="490" loading="lazy"><b>Carteiras on-chain</b><p>Solana, Ethereum, Base e Bitcoin, com ranking de 7 dias. Só dados públicos.</p></article>
+          <article class="paper-mini" data-tilt><img src="../assets/img/agenda-pt-BR.webp" alt="" width="620" height="490" loading="lazy"><b>Agenda e radar</b><p>FOMC, CPI e manchetes dos seus feeds; alarme na sala antes do evento.</p></article>
+          <article class="paper-mini" data-tilt><img src="../assets/img/machines-pt-BR.webp" alt="" width="620" height="443" loading="lazy"><b>Sala de máquinas</b><p>Um rack por fonte, com a latência e o limite de cada API.</p></article>
+          <article class="paper-mini" data-tilt><img src="../assets/img/bubbles-pt-BR.webp" alt="" width="620" height="490" loading="lazy"><b>Bolhas</b><p>Robôs e carteiras: tamanho é capital, cor é resultado.</p></article>
+        </div>
+      </div>
+    </section>
+
     <section class="block" id="rodar" aria-labelledby="rodar-h">
       <div class="wrap">
         <div class="head">
-          <div class="kicker"><i>05</i> COMO RODAR</div>
+          <div class="kicker"><i>06</i> COMO RODAR</div>
           <h2 id="rodar-h">Dois repositórios. Node 22.12 ou mais novo.</h2>
         </div>
         <div class="runs">
@@ -202,14 +237,14 @@
 <span class="ln c"># abra http://localhost:5173/?source=core<span class="caret" aria-hidden="true"></span></span></pre>
           </div>
         </div>
-        <p class="hint">Escolha corretoras, pares e alertas no Bullroom (clique no selo LIVE, ou Configurações › Mercados), ou edite <code>~/.openspread/config.json</code>. Só o Bullroom? Abra com <code>?mock=trading</code> para robôs simulados, sem corretora nenhuma.</p>
+        <p class="hint">Escolha corretoras, pares e alertas no Bullroom (clique no selo LIVE, ou Configurações › Mercados), ou edite <code>~/.openspread/config.json</code>. Robôs simulados: Configurações › Robôs. Só o Bullroom? Abra com <code>?mock=trading</code> para robôs simulados, sem corretora nenhuma.</p>
       </div>
     </section>
 
     <section class="block" aria-labelledby="regras">
       <div class="wrap">
         <div class="head">
-          <div class="kicker"><i>06</i> PRINCÍPIOS</div>
+          <div class="kicker"><i>07</i> PRINCÍPIOS</div>
           <h2 id="regras">O que não muda.</h2>
         </div>
         <div class="grid4">
@@ -224,7 +259,7 @@
     <section class="block" id="roteiro" aria-labelledby="roteiro-h">
       <div class="wrap">
         <div class="head">
-          <div class="kicker"><i>07</i> ROTEIRO</div>
+          <div class="kicker"><i>08</i> ROTEIRO</div>
           <h2 id="roteiro-h">Construído em etapas, em público.</h2>
         </div>
         <ol class="road">
@@ -234,8 +269,9 @@
           <li><span class="st done">FEITO</span><span>Alertas de spread que tocam uma vez e rearmam.</span></li>
           <li><span class="st done">FEITO</span><span>Calendário econômico e radar na sala; sala de máquinas (limites das APIs, latência).</span></li>
           <li><span class="st done">FEITO</span><span>Paper trading embutido: robôs simulados sobre o livro real, com trava de risco e sala própria. Sem chave e sem ordem real.</span></li>
-          <li><span class="st next">PRÓXIMO</span><span>MCP: o seu próprio Claude ou Codex criando e testando estratégias.</span></li>
-          <li><span class="st later">DEPOIS</span><span>Ordens reais atrás de uma política de risco; Nostr para identidade e análises assinadas.</span></li>
+          <li><span class="st next">PRÓXIMO</span><span>MCP: o seu próprio Claude ou Codex criando e testando estratégias, com esquema de análise e acerto medido com método.</span></li>
+          <li><span class="st later">DEPOIS</span><span>Ordens reais com política de risco e aprovação por ordem, usando o Hummingbot.</span></li>
+          <li><span class="st later">DEPOIS</span><span>Nostr: identidade, análises assinadas, threads e zaps.</span></li>
         </ol>
       </div>
     </section>
