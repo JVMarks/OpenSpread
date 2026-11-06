@@ -3,14 +3,14 @@
 # OpenSpread
 
 **Open-source, local-first hub for stablecoin arbitrage and crypto trading.** It runs on your own computer, reads
-the exchanges you choose, shows the real net spread after fees, and (in later stages) lets your own Claude or Codex
-design and test bots. No server of ours, no tracking. *A bitcoin100treta project.*
+the exchanges you choose, shows the real net spread after fees, and lets your own Claude or Codex read the data, record
+scored analyses and test simulated bots. No server of ours, no tracking. *A bitcoin100treta project.*
 
 **Website and live demo:** https://bullroom.vercel.app
 **Visual companion:** [Bullroom](https://github.com/JVMarks/bullroom), your bots as an animated pixel-art office.
 
-> **Current stage: read-only market data.** The core reads public market data only. No API keys, no orders, no
-> custody. The only thing it writes is its own settings file (which exchanges and pairs to read).
+> **Current stage: public data, simulation and scored analyses.** The core reads public market data only. No exchange API
+> keys, no real orders, no custody. It only writes files next to its own settings.
 > Educational project, **not financial advice**.
 
 ## What works today
@@ -21,6 +21,8 @@ design and test bots. No server of ours, no tracking. *A bitcoin100treta project
 - [Bullroom](https://github.com/JVMarks/bullroom) shows it live: one room per pair, one character per exchange.
 - **Built-in paper trading** (off by default, nothing extra to install): arbitrage robots simulated on real public order
   books, with no keys and no real orders. See below.
+- **MCP server** for your own Claude or Codex: read data, record analyses, start and stop simulated robots. No tool can place
+  a real order. See below.
 
 ## Run it
 
@@ -138,10 +140,54 @@ rewritten here.
 
 This is software, not investment advice.
 
+## Connect Claude or Codex (MCP)
+
+With the core running (`npm start`), register the server with your own client. Use the full path to your clone:
+
+```bash
+claude mcp add openspread -- node /full/path/to/OpenSpread/core/bin/openspread-mcp.mjs
+```
+
+```bash
+codex mcp add openspread -- node /full/path/to/OpenSpread/core/bin/openspread-mcp.mjs
+```
+
+The server runs over stdio and only talks to the core on `127.0.0.1` (another port: `OPENSPREAD_PORT`). It needs no key of its own.
+Whatever your client sends to its model, including chart screenshots and the data these tools return, follows that client's terms.
+Tested with an MCP client over stdio against live exchange data. Not yet tested inside the Claude Code or Codex apps.
+
+| Tool | What it does |
+|---|---|
+| `get_market`, `get_agenda`, `get_wallets`, `get_sources` | Read quotes and spreads, the calendar and headlines, public wallets, data source health |
+| `get_risk_policy`, `get_paper_bots` | Read your limits and the simulated robots |
+| `get_scoreboard`, `list_analyses` | Read the scoreboard and past analyses |
+| `submit_analysis` | Record an analysis. It is permanent and places no order |
+| `start_paper_bot`, `stop_paper_bot` | Start or stop a **simulated** robot, through the same risk gate |
+
+**That list is closed.** There is no tool for real orders, withdrawals, API keys, or changing your settings or risk limits; a test
+fails if one is added. Headlines and third-party labels arrive under `untrusted`, as data and never as instructions, but a
+malicious headline can still try to influence your model, so read what it proposes.
+
+### How analyses are scored
+
+An analysis has a direction, a conviction from 50 to 100 (the stated probability of being right), factors, optional plans A and B
+with a stop and targets, and its reasoning. Hit rate alone says nothing, so the scoreboard shows the method too:
+
+- **The core sets the reference price** (median of the exchange mid prices) when it records the analysis. The client cannot send one.
+- **Permanent:** analyses cannot be edited or withdrawn. Only one can be open per model, pair and horizon (1h, 4h, 24h or 7d).
+- **Direction:** compared with the first price sampled at or after expiry. A tie counts as a miss.
+- **Plans:** the first touch of the stop or first target closes the plan, otherwise it closes at expiry. When the order is unknown, the
+  stop wins. Results subtract two public taker fees, and nothing else: no slippage, no funding, no transfer.
+- **Missing data:** with no sample within 15 minutes of expiry, the analysis counts as `void`, reported apart, and never disappears.
+- **Sample:** no hit rate below 30 resolved analyses.
+- **Calibration:** the Brier score, against 0.25 for always saying 50%. Above 0 in `skill` beats that coin flip.
+
+Analyses in a row on one asset are not independent, stablecoin pairs barely move, and `model` is only what the client declares, so
+treat the numbers as evidence, not proof. They live in `analyses/`, next to the config, on your machine. Not financial advice.
+
 ## Roadmap
 
-MCP so your own Claude/Codex can design strategies → real orders with Hummingbot behind the same risk gate → Nostr for identity,
-signed analyses and donations.
+Real orders with Hummingbot behind the same risk gate → Nostr for identity, signed analyses and donations.
 
 ## Support
 
