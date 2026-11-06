@@ -187,6 +187,7 @@
               <li>Your exchanges and pairs in one local file, <code>~/.openspread/config.json</code>.</li>
               <li>Spread alerts that ring once and re-arm, so they do not flicker.</li>
               <li><span class="pill">NEW</span>Built-in paper trading, with a risk gate before every simulated order.</li>
+              <li><span class="pill">NEW</span>MCP for your Claude or Codex: read data, record analyses and test simulated robots. Real orders do not exist there.</li>
               <li>Serves it on <code>127.0.0.1</code>, with no server of ours: the only requests out are public ones to exchanges, chains and the feeds you pick.</li>
             </ul>
             <div class="actions"><a class="btn ghost" href="https://github.com/JVMarks/OpenSpread">OpenSpread on GitHub</a></div>
@@ -201,6 +202,7 @@
               <li>Markets panel: choose exchanges and pairs, and set alerts, from the room.</li>
               <li>A bot that hits its daily loss limit is ejected from the room.</li>
               <li><span class="pill">NEW</span>Simulation room and Robots panel: start, stop and see why each robot stopped.</li>
+              <li><span class="pill">NEW</span>Analyses panel: hit rate only with a sample, calibration, and results already after fees.</li>
               <li>Simulated in the browser, or live with OpenSpread.</li>
             </ul>
             <div class="actions">
@@ -259,8 +261,8 @@
           <li><span class="st done">DONE</span><span>Spread alerts that ring once and re-arm.</span></li>
           <li><span class="st done">DONE</span><span>Economic calendar and radar in the room; machine room (API limits, latency).</span></li>
           <li><span class="st done">DONE</span><span>Built-in paper trading: robots simulated on the real order book, with a risk gate and their own room. No keys, no real orders.</span></li>
-          <li><span class="st next">NEXT</span><span>MCP: your own Claude or Codex designing and testing strategies, with an analysis schema and a methodically scored track record.</span></li>
-          <li><span class="st later">LATER</span><span>Real orders with a risk policy and approval per order, using Hummingbot.</span></li>
+          <li><span class="st done">DONE</span><span>MCP: your own Claude or Codex reads the data, records analyses and tests simulated robots, with a methodically scored track record. No tool can place a real order.</span></li>
+          <li><span class="st next">NEXT</span><span>Real orders with a risk policy and approval per order, using Hummingbot.</span></li>
           <li><span class="st later">LATER</span><span>Nostr: identity, signed analyses, threads and zaps.</span></li>
         </ol>
       </div>

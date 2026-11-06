@@ -187,6 +187,7 @@
               <li>Suas corretoras e pares num arquivo local, <code>~/.openspread/config.json</code>.</li>
               <li>Alertas de spread que tocam uma vez e rearmam, sem ficar piscando.</li>
               <li><span class="pill">NOVO</span>Paper trading embutido, com trava de risco antes de cada ordem simulada.</li>
+              <li><span class="pill">NOVO</span>MCP para o seu Claude ou Codex: ler dados, registrar análises e testar robôs simulados. Ordem real não existe ali.</li>
               <li>Serve tudo em <code>127.0.0.1</code>, sem servidor nosso: só faz pedidos públicos a corretoras, redes e os feeds que você escolher.</li>
             </ul>
             <div class="actions"><a class="btn ghost" href="https://github.com/JVMarks/OpenSpread">OpenSpread no GitHub</a></div>
@@ -201,6 +202,7 @@
               <li>Painel Mercados: escolha corretoras e pares, e crie alertas, de dentro da sala.</li>
               <li>O robô que bate o limite de perda do dia é ejetado da sala.</li>
               <li><span class="pill">NOVO</span>Sala de simulação e painel Robôs: ligue, pare e veja o motivo de cada parada.</li>
+              <li><span class="pill">NOVO</span>Painel Análises: acerto só com amostra, calibração e resultado já com as taxas.</li>
               <li>Simulado no navegador, ou ao vivo com o OpenSpread.</li>
             </ul>
             <div class="actions">
@@ -259,8 +261,8 @@
           <li><span class="st done">FEITO</span><span>Alertas de spread que tocam uma vez e rearmam.</span></li>
           <li><span class="st done">FEITO</span><span>Calendário econômico e radar na sala; sala de máquinas (limites das APIs, latência).</span></li>
           <li><span class="st done">FEITO</span><span>Paper trading embutido: robôs simulados sobre o livro real, com trava de risco e sala própria. Sem chave e sem ordem real.</span></li>
-          <li><span class="st next">PRÓXIMO</span><span>MCP: o seu próprio Claude ou Codex criando e testando estratégias, com esquema de análise e acerto medido com método.</span></li>
-          <li><span class="st later">DEPOIS</span><span>Ordens reais com política de risco e aprovação por ordem, usando o Hummingbot.</span></li>
+          <li><span class="st done">FEITO</span><span>MCP: o seu próprio Claude ou Codex lê os dados, registra análises e testa robôs simulados, com o acerto medido com método. Nenhuma ferramenta envia ordem real.</span></li>
+          <li><span class="st next">PRÓXIMO</span><span>Ordens reais com política de risco e aprovação por ordem, usando o Hummingbot.</span></li>
           <li><span class="st later">DEPOIS</span><span>Nostr: identidade, análises assinadas, threads e zaps.</span></li>
         </ol>
       </div>

@@ -221,7 +221,7 @@ pre .cmd::before { content: "$ "; color: var(--must); }
 
 /* ------------------------------------------------------------------ roteiro */
 .road-sec { padding-top: 0; }
-.road { --done: 66%; list-style: none; padding: 0 0 0 28px; margin: 0; display: grid; gap: 2px; position: relative; }
+.road { --done: 76%; list-style: none; padding: 0 0 0 28px; margin: 0; display: grid; gap: 2px; position: relative; }
 .road::before { content: ""; position: absolute; left: 7px; top: 12px; bottom: 12px; width: 2px; background: linear-gradient(var(--must) 0 var(--done), var(--line) var(--done)); }
 .road li { position: relative; display: flex; gap: 14px; align-items: baseline; padding: 10px 0; }
 .road li::before { content: ""; position: absolute; left: -26px; top: 18px; width: 10px; height: 10px; background: var(--line); }
