@@ -446,6 +446,8 @@ export type EngineBotStatus = 'running' | 'parked' | 'stopped' | 'ejected';
 /** Um robô simulado: arbitragem de um par entre duas corretoras, nos dois sentidos. */
 export interface EngineBot {
   id: string;
+  /** Quem ligou. Ausente em robôs antigos = usuário. */
+  source?: 'user' | 'mcp';
   pair: string;
   exchanges: [string, string];
   capitalUsd: number;

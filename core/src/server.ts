@@ -2,10 +2,12 @@
 // mudança). CORS só para as origens do Bullroom. Sem dependências além do Node.
 // Configuração (quando ligada): GET /v1/config, POST /v1/check (confere sem gravar) e PUT /v1/config (grava e aplica).
 // Essas rotas exigem Host local (contra DNS rebinding), Origin da lista quando vier, JSON e corpo pequeno.
+// Análises (quando ligadas): POST /v1/analyses registra, GET /v1/analyses devolve tudo com o raciocínio. Mesmas exigências.
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
 import type { Validation } from './config';
-import type { CheckResult, ConfigInfo, CoreConfig, CoreState, EngineBot, RiskReason } from './types';
+import type { SubmitResult } from './analysis/book';
+import type { AnalysesState, CheckResult, ConfigInfo, CoreConfig, CoreState, EngineBot, RiskReason } from './types';
 
 export const DEFAULT_PORT = 4848;
 const MAX_BODY = 16 * 1024;
@@ -25,6 +27,12 @@ export interface EngineHandlers {
   stop(id: string): EngineBot | undefined;
 }
 
+/** Registrar e ler análises (main.ts liga no livro). */
+export interface AnalysisHandlers {
+  submit(raw: unknown): SubmitResult;
+  state(): AnalysesState;
+}
+
 export interface ServerOptions {
   port?: number;
   /** Origens que podem ler pelo navegador (o Bullroom). */
@@ -35,6 +43,8 @@ export interface ServerOptions {
   config?: ConfigHandlers;
   /** Sem isto, as rotas do motor respondem 404. */
   engine?: EngineHandlers;
+  /** Sem isto, as rotas de análises respondem 404. */
+  analyses?: AnalysisHandlers;
 }
 
 const STOP_ROUTE = /^\/v1\/engine\/bots\/([A-Za-z0-9_-]{1,64})\/stop$/;
@@ -154,6 +164,20 @@ export function startServer(getState: () => CoreState, opts: ServerOptions = {})
     return json(res, 201, started);
   };
 
+  const handleAnalyses = async (req: http.IncomingMessage, res: http.ServerResponse, analyses: AnalysisHandlers) => {
+    guard(req);
+    if (req.method === 'OPTIONS') {
+      res.writeHead(204, { 'Access-Control-Allow-Methods': 'GET, POST', 'Access-Control-Allow-Headers': 'Content-Type', 'Access-Control-Max-Age': '600' });
+      res.end();
+      return;
+    }
+    if (req.method === 'GET') return json(res, 200, analyses.state());
+    if (req.method !== 'POST') throw new HttpError(405, 'method_not_allowed');
+    const r = analyses.submit(await readJson(req));
+    if (!r.ok) throw new HttpError(422, r.code, r.errors);
+    return json(res, 201, r.analysis);
+  };
+
   const fail = (res: http.ServerResponse) => (e: unknown) => {
     if (res.headersSent) return;
     if (e instanceof HttpError) json(res, e.status, { error: e.code, ...(e.details ? { details: e.details } : {}) });
@@ -181,6 +205,10 @@ export function startServer(getState: () => CoreState, opts: ServerOptions = {})
     }
     if (opts.engine && (path === '/v1/engine/bots' || STOP_ROUTE.test(path))) {
       handleEngine(req, res, path, opts.engine).catch(fail(res));
+      return;
+    }
+    if (opts.analyses && path === '/v1/analyses') {
+      handleAnalyses(req, res, opts.analyses).catch(fail(res));
       return;
     }
     res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });

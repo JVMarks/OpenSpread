@@ -15,6 +15,8 @@ export interface BotRequest {
   pair: string;
   exchanges: [string, string];
   capitalUsd?: number;
+  /** Quem pediu; o MCP sempre manda 'mcp'. */
+  source?: 'user' | 'mcp';
 }
 
 export interface ManagerOptions {
@@ -29,7 +31,7 @@ export interface ManagerOptions {
 
 type StartResult = EngineBot | { errors: RiskReason[] };
 
-const BOT_FIELDS = new Set(['pair', 'exchanges', 'capitalUsd']);
+const BOT_FIELDS = new Set(['pair', 'exchanges', 'capitalUsd', 'source']);
 const PAIR = /^[A-Z0-9]{2,12}\/[A-Z0-9]{2,12}$/;
 const EXCHANGE = /^[a-z0-9_-]{1,40}$/;
 const SERIES = 60;
@@ -55,9 +57,11 @@ export function parseBotRequest(raw: unknown): BotRequest | null {
   if (typeof a !== 'string' || typeof b !== 'string') return null;
   const exchanges: [string, string] = [a.trim().toLowerCase(), b.trim().toLowerCase()];
   if (!exchanges.every((id) => EXCHANGE.test(id))) return null;
-  if (r.capitalUsd === undefined) return { pair, exchanges };
+  if (r.source !== undefined && r.source !== 'user' && r.source !== 'mcp') return null;
+  const source: Pick<BotRequest, 'source'> = r.source === undefined ? {} : { source: r.source };
+  if (r.capitalUsd === undefined) return { pair, exchanges, ...source };
   if (typeof r.capitalUsd !== 'number' || !Number.isFinite(r.capitalUsd) || r.capitalUsd <= 0) return null;
-  return { pair, exchanges, capitalUsd: r.capitalUsd };
+  return { pair, exchanges, capitalUsd: r.capitalUsd, ...source };
 }
 
 const active = (b: EngineBot): boolean => b.status === 'running' || b.status === 'parked';
@@ -189,6 +193,7 @@ export class EngineManager {
     const wallet = () => ({ [asset]: quarter / (price as number), [quote]: quarter });
     const bot: EngineBot = {
       id: `bot-${this.nextId++}`,
+      ...(req.source ? { source: req.source } : {}),
       pair: req.pair,
       exchanges: [a, b],
       capitalUsd: capital.usd,
@@ -209,7 +214,7 @@ export class EngineManager {
     this.bots.push(bot);
     this.day.set(bot.id, utcDay(now));
     this.prune();
-    this.write({ at: now, kind: 'start', botId: bot.id, data: { pair: bot.pair, exchanges: bot.exchanges, capitalUsd: bot.capitalUsd } });
+    this.write({ at: now, kind: 'start', botId: bot.id, data: { pair: bot.pair, exchanges: bot.exchanges, capitalUsd: bot.capitalUsd, source: bot.source ?? 'user' } });
     this.changed();
     return bot;
   }

@@ -84,6 +84,28 @@ describe('gerente do motor', () => {
   });
   afterEach(() => rmSync(dir, { recursive: true, force: true }));
 
+  it('guarda quem ligou o robô e registra; robô antigo sem source continua carregando', () => {
+    expect(parseBotRequest({ pair: 'BTC/USDT', exchanges: ['a', 'b'], source: 'mcp' })?.source).toBe('mcp');
+    expect(parseBotRequest({ pair: 'BTC/USDT', exchanges: ['a', 'b'], source: 'outro' })).toBeNull();
+    const m = manager();
+    m.evaluate(state(clock));
+    const bot = m.startBot({ pair: 'BTC/USDT', exchanges: ['a', 'b'], source: 'mcp' });
+    if ('errors' in bot) throw new Error(JSON.stringify(bot.errors));
+    expect(bot.source).toBe('mcp');
+    expect(ledger.read(100).find((e) => e.kind === 'start')?.data).toMatchObject({ source: 'mcp' });
+
+    const { source: _source, ...old } = bot;
+    m.stopBot(bot.id);
+    m.save();
+    const file = join(dir, 'engine', 'bots.json');
+    const saved = JSON.parse(readFileSync(file, 'utf8')) as { bots: unknown[] };
+    saved.bots = [old];
+    writeFileSync(file, JSON.stringify(saved));
+    const again = manager();
+    again.load();
+    expect(again.state(clock).bots[0].source).toBeUndefined();
+  });
+
   it('sem engine no config, ou desligado: não faz nada', async () => {
     for (const c of [undefined, { ...CONFIG, enabled: false }]) {
       config = c;

@@ -3,7 +3,8 @@ import type { AddressInfo } from 'node:net';
 import http from 'node:http';
 import { startServer, type ConfigHandlers, type EngineHandlers } from './server';
 import { DEFAULT_CONFIG, LIMITS, validateConfig } from './config';
-import type { CoreConfig, CoreState, EngineBot } from './types';
+import type { SubmitResult } from './analysis/book';
+import type { AnalysesState, Analysis, CoreConfig, CoreState, EngineBot } from './types';
 
 const STATE: CoreState = { rev: 3, at: 1, exchanges: [{ id: 'okx', ok: true, lastAt: 1 }], pairs: [] };
 const BULLROOM = 'http://localhost:5173';
@@ -246,5 +247,58 @@ describe('rotas de configuração', () => {
     expect(checked).toHaveLength(1);
     expect(checked[0].pairs).toEqual(['ETH/USDT']);
     expect(saved).toEqual([]);
+  });
+});
+
+describe('rotas de análises', () => {
+  const start2 = async (submit = (): SubmitResult => ({ ok: false, code: 'invalid', errors: ['errado'] })) => {
+    const analyses = { submit, state: () => ({ at: 1, open: [], recent: [], notice: 'n', scoreboard: { minSample: 30 } }) as unknown as AnalysesState };
+    server = startServer(() => STATE, { port: 0, allowOrigins: [BULLROOM], analyses });
+    await new Promise<void>((r) => server!.once('listening', () => r()));
+    return `http://127.0.0.1:${(server.address() as AddressInfo).port}/v1/analyses`;
+  };
+  const post = (url: string, body = '{}', headers: Record<string, string> = { 'Content-Type': 'application/json' }) => fetch(url, { method: 'POST', body, headers });
+
+  it('sem handlers responde 404', async () => {
+    const base = await start();
+    expect((await fetch(`${base}/v1/analyses`)).status).toBe(404);
+  });
+  it('GET devolve o placar', async () => {
+    const r = await fetch(await start2());
+    expect(r.status).toBe(200);
+    expect(await r.json()).toMatchObject({ scoreboard: { minSample: 30 } });
+  });
+  it('POST sem JSON dá 415', async () => {
+    expect((await post(await start2(), '{}', { 'Content-Type': 'text/plain' })).status).toBe(415);
+  });
+  it('Origin fora da lista dá 403; a do Bullroom passa', async () => {
+    const url = await start2();
+    expect((await post(url, '{}', { 'Content-Type': 'application/json', Origin: 'https://evil.example' })).status).toBe(403);
+    expect((await post(url, '{}', { 'Content-Type': 'application/json', Origin: BULLROOM })).status).toBe(422);
+  });
+  it('Host estranho dá 403', async () => {
+    const url = new URL(await start2());
+    const status = await new Promise<number>((resolve, reject) => {
+      const req = http.request({ host: '127.0.0.1', port: url.port, path: url.pathname, method: 'GET', headers: { Host: 'evil.example' } }, (res) => {
+        res.resume();
+        resolve(res.statusCode ?? 0);
+      });
+      req.on('error', reject);
+      req.end();
+    });
+    expect(status).toBe(403);
+  });
+  it('corpo acima de 16 KB dá 413', async () => {
+    expect((await post(await start2(), JSON.stringify({ x: 'a'.repeat(17 * 1024) }))).status).toBe(413);
+  });
+  it('recusa do livro vira 422 com o código e os detalhes', async () => {
+    const r = await post(await start2());
+    expect(r.status).toBe(422);
+    expect(await r.json()).toEqual({ error: 'invalid', details: ['errado'] });
+  });
+  it('aceita com 201', async () => {
+    const r = await post(await start2(() => ({ ok: true, analysis: { id: 'a_1' } as Analysis })));
+    expect(r.status).toBe(201);
+    expect(await r.json()).toEqual({ id: 'a_1' });
   });
 });

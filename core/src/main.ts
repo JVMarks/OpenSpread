@@ -1,6 +1,7 @@
 // OpenSpread core: lê cotações públicas nas corretoras configuradas e serve em 127.0.0.1:4848.
 // Uso: npm start  (porta: OPENSPREAD_PORT; arquivo de configuração: OPENSPREAD_CONFIG, padrão ~/.openspread/config.json)
 import ccxt from 'ccxt';
+import { AnalysisBook } from './analysis/book';
 import { SpreadAlerts } from './alerts';
 import { applyTransfer } from './transfer';
 import { SpreadHistory } from './history';
@@ -118,16 +119,20 @@ const engine = new EngineManager(paper, {
 });
 engine.load();
 log(engine.enabled() ? `motor de paper ligado (simulado, sem ordem real): ${config.engine?.policy.allowedPairs.length ?? 0} par(es) permitido(s)` : 'motor de paper desligado');
+// Análises do Claude/Codex do usuário: só acréscimo, ao lado do config. Preço de referência e resultado vêm daqui.
+const analyses = new AnalysisBook({ dir: join(dirname(file), 'analyses'), log });
+analyses.load();
 /** Estado servido: o do Poller com o custo de transferência da configuração em cada melhor spread. */
 const history = new SpreadHistory();
 const historyFile = join(dirname(file), 'history.json');
 history.load(historyFile, Date.now());
 const current = (): CoreState => {
   const s = poller.state();
-  const out: CoreState = { ...s, rev: s.rev + watcher.rev + agenda.rev + engine.rev, pairs: history.apply(applyTransfer(s.pairs, config.transfer), s.at) };
+  const out: CoreState = { ...s, rev: s.rev + watcher.rev + agenda.rev + engine.rev + analyses.rev, pairs: history.apply(applyTransfer(s.pairs, config.transfer), s.at) };
   if (engine.enabled()) out.engine = engine.state(s.at);
   if (watcher.hasWallets()) out.wallets = watcher.state(s.at);
   out.agenda = agenda.state(config, s.at);
+  out.analyses = analyses.brief();
   out.machine = machineState({ now: s.at, cpuPct: cpu.sample(), exchanges: s.exchanges, rateLimits: poller.rateLimits(), chains: out.wallets?.sources ?? [], feeds: out.agenda.feeds, usage });
   return out;
 };
@@ -141,12 +146,14 @@ const saveHistory = () => {
 setInterval(() => {
   saveHistory();
   if (engine.enabled()) engine.save();
+  analyses.save();
 }, 5 * 60_000).unref();
 for (const sig of ['SIGINT', 'SIGTERM'] as const) {
   process.on(sig, () => {
     saveHistory();
     watcher.saveCache();
     engine.save();
+    analyses.save();
     process.exit(0);
   });
 }
@@ -161,6 +168,7 @@ const tick = async () => {
     const s = current();
     history.record(s.pairs, s.at);
     engine.evaluate(s);
+    analyses.tick(s.pairs, s.at);
     for (const e of alerts.evaluate(config.alerts, s.pairs, s.at)) {
       log(`alerta: ${e.pair} com spread líquido de ${e.netPct.toFixed(3)}% (nível ${e.abovePct}%), ${e.buyOn} → ${e.sellOn}`);
     }
@@ -199,6 +207,10 @@ const server = startServer(() => ({ ...current(), alerts: alerts.events() }), {
       return req && engine.startBot(req);
     },
     stop: (id) => engine.stopBot(id),
+  },
+  analyses: {
+    submit: (raw) => analyses.submit(raw, current().pairs, Date.now()),
+    state: () => analyses.state(Date.now()),
   },
 });
 server.on('listening', () => log(`OpenSpread core em http://127.0.0.1:${port} (dados públicos de mercado; sem chave, sem ordem)`));
