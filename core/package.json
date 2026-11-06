@@ -12,9 +12,11 @@
     "start": "node --import tsx src/main.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "check:exchanges": "tsx scripts/check-exchanges.ts"
+    "check:exchanges": "tsx scripts/check-exchanges.ts",
+    "mcp": "node bin/openspread-mcp.mjs"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.2",
     "ccxt": "4.5"
   },
   "devDependencies": {
