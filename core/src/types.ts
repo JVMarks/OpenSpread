@@ -90,6 +90,8 @@ export interface CoreState {
   agenda?: AgendaState;
   /** Motor de paper trading. Ausente quando desligado: tudo aqui é simulado. */
   engine?: EngineState;
+  /** Análises registradas e placar. Ausente em núcleos antigos. */
+  analyses?: AnalysesBrief;
 }
 
 /** "Avise quando o spread líquido do par chegar a X%." Toca uma vez; rearma quando o spread recua. */
@@ -510,4 +512,146 @@ export interface EngineState {
   latencyMs: number;
   /** Perda diária máxima por robô, da política. */
   dailyLossLimitUsd: number;
+}
+
+// --- Análises (etapa 4). A IA do usuário registra; o preço de referência e o resultado vêm só do núcleo. ---
+
+export type AnalysisHorizon = '1h' | '4h' | '24h' | '7d';
+export type AnalysisDirection = 'up' | 'down';
+
+export interface AnalysisFactor {
+  name: string;
+  category: 'technical' | 'derivatives' | 'macro' | 'sentiment' | 'onchain' | 'spread';
+  effect: 'supports' | 'neutral' | 'weakens';
+  note?: string;
+}
+
+export interface AnalysisPlan {
+  label: 'A' | 'B';
+  /** `market` entra na referência; `confirmation` entra quando o preço toca `entry`. */
+  kind: 'market' | 'confirmation';
+  entry?: number;
+  stop: number;
+  /** O primeiro alvo fecha o plano. */
+  targets: number[];
+}
+
+/** O que o cliente manda. Nenhum campo de preço de referência: esse é do núcleo. */
+export interface AnalysisInput {
+  pair: string;
+  horizon: AnalysisHorizon;
+  direction: AnalysisDirection;
+  /** Probabilidade declarada de a direção acertar, de 50 a 100. */
+  conviction: number;
+  factors: AnalysisFactor[];
+  plans: AnalysisPlan[];
+  reasoning: string;
+  /** Rótulo declarado pelo cliente; não é prova de qual modelo escreveu. */
+  model: string;
+  usedChart: boolean;
+}
+
+export interface Analysis extends AnalysisInput {
+  id: string;
+  submittedAt: number;
+  /** submittedAt + horizonte. */
+  expiresAt: number;
+  referencePrice: number;
+  /** Custo de ida e volta (duas taxas taker), em %. */
+  costPct: number;
+  /** Quantas corretoras formaram a referência. */
+  exchanges: number;
+}
+
+export interface PlanResult {
+  label: 'A' | 'B';
+  /** target/stop = tocou; closed = fechou no vencimento; not_triggered = não entrou; void = faltaram dados. */
+  status: 'target' | 'stop' | 'closed' | 'not_triggered' | 'void';
+  entryPrice?: number;
+  exitPrice?: number;
+  /** Já com as duas taxas, em %. */
+  netPct?: number;
+}
+
+export interface AnalysisResult {
+  id: string;
+  pair: string;
+  model: string;
+  horizon: AnalysisHorizon;
+  direction: AnalysisDirection;
+  conviction: number;
+  /** void = sem amostra até 15 min depois do vencimento: conta à parte, nunca some. */
+  status: 'resolved' | 'void';
+  reason?: 'no_data';
+  hit?: boolean;
+  closePrice?: number;
+  /** Variação da referência ao fechamento, em %. */
+  movePct?: number;
+  resolvedAt: number;
+  plans: PlanResult[];
+}
+
+export interface CalibrationBin {
+  from: number;
+  to: number;
+  n: number;
+  /** Convicção média, em %; null sem amostra. */
+  meanConviction: number | null;
+  /** Acerto observado, em %; null sem amostra. */
+  hitPct: number | null;
+}
+
+export interface ScoreLine {
+  /** Ausentes na linha do total. */
+  model?: string;
+  horizon?: AnalysisHorizon;
+  submitted: number;
+  open: number;
+  resolved: number;
+  voids: number;
+  hits: number;
+  /** % de acerto; null abaixo da amostra mínima. */
+  hitPct: number | null;
+  /** Média de (probabilidade − resultado)²; null sem resolvidas. */
+  brier: number | null;
+  /** Sempre 0,25: o de quem diz 50% em tudo. */
+  baselineBrier: number;
+  /** 1 − brier / 0,25: acima de 0 bate o chute. Null sem resolvidas. */
+  skill: number | null;
+  calibration: CalibrationBin[];
+  plans: { triggered: number; avgNetPct: number | null; worstNetPct: number | null };
+}
+
+export interface Scoreboard {
+  /** Abaixo disto, `hitPct` fica null. */
+  minSample: number;
+  total: ScoreLine;
+  byModel: ScoreLine[];
+}
+
+/** Resposta de GET /v1/analyses: completa, com o raciocínio. */
+export interface AnalysesState {
+  at: number;
+  scoreboard: Scoreboard;
+  open: Analysis[];
+  /** Resolvidas, mais novas primeiro. */
+  recent: Array<{ analysis: Analysis; result: AnalysisResult }>;
+  notice: string;
+}
+
+/** Versão curta que vai em `CoreState.analyses` a cada leitura: sem raciocínio nem fatores. */
+export interface AnalysesBrief {
+  scoreboard: Scoreboard;
+  items: Array<{
+    id: string;
+    pair: string;
+    model: string;
+    horizon: AnalysisHorizon;
+    direction: AnalysisDirection;
+    conviction: number;
+    submittedAt: number;
+    expiresAt: number;
+    referencePrice: number;
+    result?: Pick<AnalysisResult, 'status' | 'hit' | 'movePct' | 'resolvedAt'>;
+  }>;
 }
