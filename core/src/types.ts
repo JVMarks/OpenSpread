@@ -92,6 +92,8 @@ export interface CoreState {
   engine?: EngineState;
   /** Análises registradas e placar. Ausente em núcleos antigos. */
   analyses?: AnalysesBrief;
+  /** Resumo do modo real, sem saldo nem ficha: o detalhe só sai pela rota protegida. Ausente em núcleos antigos. */
+  live?: LiveBrief;
 }
 
 /** "Avise quando o spread líquido do par chegar a X%." Toca uma vez; rearma quando o spread recua. */
@@ -656,4 +658,102 @@ export interface AnalysesBrief {
     referencePrice: number;
     result?: Pick<AnalysisResult, 'status' | 'hit' | 'movePct' | 'resolvedAt' | 'plans'>;
   }>;
+}
+
+// --- Modo real (etapa 5). Só sai ordem com ficha aprovada por uma pessoa. Nunca soma com o simulado. ---
+
+/** O que sobrou numa corretora depois de uma perna falhar. `amount` null = não dá para saber sem olhar na corretora. */
+export interface LiveExposure {
+  exchange: string;
+  pair: string;
+  asset: string;
+  side: 'long' | 'short';
+  amount: number | null;
+  /** Cotação de quando a ordem foi aprovada. */
+  price: number;
+}
+
+/** Duas pernas casadas. */
+export interface LiveFilled {
+  base: number;
+  buyAvg: number;
+  sellAvg: number;
+  feesUsd: number;
+  pnlUsd: number;
+  realizedNetPct: number;
+  partial: boolean;
+  /** A corretora não informou a taxa em moeda conhecida: foi usada a pública. */
+  feeEstimated: boolean;
+}
+
+/** Uma ordem à espera de aprovação: vale 20 s e uma vez só. */
+export interface LiveTicket {
+  id: string;
+  kind: 'arbitrage' | 'unwind';
+  pair: string;
+  /** Arbitragem: as duas corretoras. Desfazer: só a da exposição. */
+  buyOn?: string;
+  sellOn?: string;
+  sizeUsd: number;
+  /** Quantidade da moeda-base, em desfazer. */
+  amount?: number;
+  /** Cotações vistas ao criar. */
+  quotedAsk: number;
+  quotedBid: number;
+  /** Preço máximo de compra e mínimo de venda: nada sai fora disso. */
+  limitAsk: number;
+  limitBid: number;
+  /** Líquido estimado, já com as duas taxas. */
+  netPct: number;
+  buyFee: number;
+  sellFee: number;
+  createdAt: number;
+  expiresAt: number;
+  /** sha256 da operação exata. */
+  fingerprint: string;
+  /** O que a passkey assina. */
+  challenge: string;
+}
+
+export interface LiveFillRecord extends LiveFilled {
+  at: number;
+  pair: string;
+  buyOn: string;
+  sellOn: string;
+}
+
+/** O que vai em todo estado do núcleo. */
+export interface LiveBrief {
+  armed: boolean;
+  sandbox: boolean;
+  halted: boolean;
+  exposures: number;
+  ticketOpen: boolean;
+  /** Mudou: buscar GET /v1/live. */
+  rev: number;
+}
+
+export interface LiveState {
+  /** Pronto para criar fichas. */
+  armed: boolean;
+  /** Por que não está armado. */
+  off?: string;
+  /** Ambiente de teste das corretoras, sem dinheiro. */
+  sandbox: boolean;
+  /** Por que parou. Enquanto houver motivo, não sai ficha nova de arbitragem. */
+  halted: string | null;
+  exposures: LiveExposure[];
+  ticket: LiveTicket | null;
+  /** Último bloqueio da trava. */
+  blocked: RiskReason[];
+  passkey: { registered: boolean; registerOpen: boolean };
+  /** O que a passkey assina para liberar depois de uma parada; null sem parada. */
+  releaseChallenge: string | null;
+  /** Hoje, dia UTC. */
+  today: { pnlUsd: number; trades: number; expired: number; refused: number };
+  limits: { maxTradeUsd: number; dailyLossLimitUsd: number; tradesPerDay: number };
+  /** Saldos lidos nas corretoras. */
+  balances: Record<string, Record<string, number>>;
+  balanceAt: number | null;
+  fills: LiveFillRecord[];
 }

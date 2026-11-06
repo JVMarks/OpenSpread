@@ -3,6 +3,7 @@
 // Ideia do trader-risk (github.com/Jakeschincariol/trader-skill, MIT), reescrita aqui e somada às regras de
 // arbitragem: as duas pernas, saldo em cada corretora, cotação velha, corretora com erro e spread líquido mínimo.
 import { createHash } from 'node:crypto';
+import { HARD_LIMITS } from '../live/limits';
 import type { RiskPolicy, RiskReason, RiskVerdict } from '../types';
 
 /** Uma arbitragem proposta: comprar em `buyOn` e vender em `sellOn`, no mesmo instante. */
@@ -15,8 +16,8 @@ export interface ProposedTrade {
   sizeUsd: number;
   /** Spread líquido estimado, em % (0,05 = 0,05%). */
   netPct: number;
-  /** Etapa 3: só paper. Conferido também em execução, porque a operação pode vir de JSON. */
-  mode: 'paper';
+  /** Conferido também em execução, porque a operação pode vir de JSON. */
+  mode: 'paper' | 'live';
 }
 
 /** O que a trava precisa saber do mundo agora. Faltou um dado: a regra bloqueia, nunca assume que está tudo bem. */
@@ -33,6 +34,16 @@ export interface RiskContext {
   minOrderUsd: Record<string, number>;
   /** PL do robô hoje. */
   pnlTodayUsd: number;
+  /** Só no modo real. Sem isto, operação `live` é bloqueada. */
+  live?: {
+    armed: boolean;
+    /** Epoch ms da leitura de saldo na corretora. */
+    balanceAt: number | null;
+    /** Há exposição ou parada sem resolver. */
+    pending: boolean;
+    tradesToday: number;
+    tradesPerDay: number;
+  };
 }
 
 const utcDay = (now: number): string => new Date(now).toISOString().slice(0, 10);
@@ -51,7 +62,16 @@ export function checkTrade(t: ProposedTrade, ctx: RiskContext, policy: RiskPolic
   const [base, quote] = t.pair.split('/');
   const exchanges = t.buyOn === t.sellOn ? [t.buyOn] : [t.buyOn, t.sellOn];
 
-  if (t.mode !== 'paper') block('mode_not_paper', `Modo "${String(t.mode)}" recusado: esta etapa só opera em paper.`, 'Use o modo paper.');
+  if (t.mode !== 'paper' && t.mode !== 'live') block('mode_invalid', `Modo "${String(t.mode)}" recusado.`, 'Use paper ou live.');
+  if (t.mode === 'live') {
+    const live = ctx.live;
+    if (!live?.armed) block('live_not_armed', 'O modo real não está armado.', 'Arme com OPENSPREAD_LIVE=1 e live.json.');
+    if (live?.pending) block('pending_exposure', 'Há exposição ou parada sem resolver.', 'Resolva a exposição e libere antes de operar.');
+    if (!live || live.balanceAt === null || ctx.now - live.balanceAt > HARD_LIMITS.balanceAgeMs) block('balance_stale', 'Saldo da corretora velho ou não lido.', 'Espere uma nova leitura de saldo.');
+    if (t.sizeUsd > HARD_LIMITS.maxTradeUsd || policy.dailyLossLimitUsd > HARD_LIMITS.dailyLossLimitUsd) block('over_hard_limit', `Acima do teto do código (US$ ${HARD_LIMITS.maxTradeUsd} por operação, US$ ${HARD_LIMITS.dailyLossLimitUsd} de perda por dia).`, 'Reduza o valor. O teto só muda no código.');
+    const perDay = Math.min(live?.tradesPerDay ?? 0, HARD_LIMITS.tradesPerDay);
+    if ((live?.tradesToday ?? 0) >= perDay) block('trades_per_day_hit', `Limite de ${perDay} operações por dia atingido.`, 'Volta amanhã (dia UTC).');
+  }
   if (!policy.allowedPairs.includes(t.pair)) block('pair_not_allowed', `${t.pair} não está na lista de pares permitidos.`, 'Inclua o par na política de risco, se quiser operá-lo.');
   if (!Number.isFinite(t.netPct) || t.netPct < policy.minNetPct) block('net_below_min', `Líquido de ${t.netPct}% abaixo do mínimo de ${policy.minNetPct}%.`, 'Espere um spread maior ou revise o mínimo na política.');
   if (ctx.pnlTodayUsd <= -policy.dailyLossLimitUsd) block('daily_loss_hit', `Perda de hoje (US$ ${ctx.pnlTodayUsd}) chegou ao limite de US$ ${policy.dailyLossLimitUsd}.`, 'O robô volta a operar só amanhã.');

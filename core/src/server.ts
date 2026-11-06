@@ -2,11 +2,13 @@
 // mudança). CORS só para as origens do Bullroom. Sem dependências além do Node.
 // Configuração (quando ligada): GET /v1/config, POST /v1/check (confere sem gravar) e PUT /v1/config (grava e aplica).
 // Essas rotas exigem Host local (contra DNS rebinding), Origin da lista quando vier, JSON e corpo pequeno.
+// Modo real (quando ligado): saldo, ficha e aprovação só por /v1/live*, com as mesmas exigências. A aprovação pede a passkey.
 // Análises (quando ligadas): POST /v1/analyses registra, GET /v1/analyses devolve tudo com o raciocínio. Mesmas exigências.
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
 import type { Validation } from './config';
 import type { SubmitResult } from './analysis/book';
+import type { LiveReply } from './live/runtime';
 import type { AnalysesState, CheckResult, ConfigInfo, CoreConfig, CoreState, EngineBot, RiskReason } from './types';
 
 export const DEFAULT_PORT = 4848;
@@ -33,6 +35,18 @@ export interface AnalysisHandlers {
   state(): AnalysesState;
 }
 
+/** O modo real (main.ts liga no LiveRuntime). Nenhuma dessas rotas lê ou grava live.json nem chave. */
+export interface LiveHandlers {
+  state(): unknown;
+  approve(id: string, raw: unknown): Promise<LiveReply> | LiveReply;
+  reject(id: string): LiveReply;
+  stop(): LiveReply;
+  release(raw: unknown): LiveReply;
+  unwind(raw: unknown): LiveReply;
+  registrationChallenge(): LiveReply;
+  register(raw: unknown): LiveReply;
+}
+
 export interface ServerOptions {
   port?: number;
   /** Origens que podem ler pelo navegador (o Bullroom). */
@@ -45,8 +59,11 @@ export interface ServerOptions {
   engine?: EngineHandlers;
   /** Sem isto, as rotas de análises respondem 404. */
   analyses?: AnalysisHandlers;
+  /** Sem isto, as rotas do modo real respondem 404. */
+  live?: LiveHandlers;
 }
 
+const TICKET_ROUTE = /^\/v1\/live\/tickets\/([A-Za-z0-9_-]{1,64})\/(approve|reject)$/;
 const STOP_ROUTE = /^\/v1\/engine\/bots\/([A-Za-z0-9_-]{1,64})\/stop$/;
 
 class HttpError extends Error {
@@ -178,6 +195,32 @@ export function startServer(getState: () => CoreState, opts: ServerOptions = {})
     return json(res, 201, r.analysis);
   };
 
+  const handleLive = async (req: http.IncomingMessage, res: http.ServerResponse, path: string, live: LiveHandlers) => {
+    guard(req);
+    if (req.method === 'OPTIONS') {
+      res.writeHead(204, { 'Access-Control-Allow-Methods': 'GET, POST', 'Access-Control-Allow-Headers': 'Content-Type', 'Access-Control-Max-Age': '600' });
+      res.end();
+      return;
+    }
+    const reply = (r: LiveReply) => json(res, r.status, r.body);
+    if (req.method === 'GET') {
+      if (path === '/v1/live') return json(res, 200, live.state());
+      if (path === '/v1/live/passkey') return reply(live.registrationChallenge());
+      throw new HttpError(405, 'method_not_allowed');
+    }
+    if (req.method !== 'POST') throw new HttpError(405, 'method_not_allowed');
+    const ticket = TICKET_ROUTE.exec(path);
+    if (ticket) {
+      if (ticket[2] === 'reject') return reply(live.reject(ticket[1]));
+      return reply(await live.approve(ticket[1], await readJson(req)));
+    }
+    if (path === '/v1/live/stop') return reply(live.stop());
+    if (path === '/v1/live/release') return reply(live.release(await readJson(req)));
+    if (path === '/v1/live/unwind') return reply(live.unwind(await readJson(req)));
+    if (path === '/v1/live/passkey') return reply(live.register(await readJson(req)));
+    throw new HttpError(404, 'not_found');
+  };
+
   const fail = (res: http.ServerResponse) => (e: unknown) => {
     if (res.headersSent) return;
     if (e instanceof HttpError) json(res, e.status, { error: e.code, ...(e.details ? { details: e.details } : {}) });
@@ -205,6 +248,10 @@ export function startServer(getState: () => CoreState, opts: ServerOptions = {})
     }
     if (opts.engine && (path === '/v1/engine/bots' || STOP_ROUTE.test(path))) {
       handleEngine(req, res, path, opts.engine).catch(fail(res));
+      return;
+    }
+    if (opts.live && (path === '/v1/live' || path.startsWith('/v1/live/'))) {
+      handleLive(req, res, path, opts.live).catch(fail(res));
       return;
     }
     if (opts.analyses && path === '/v1/analyses') {
