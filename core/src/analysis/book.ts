@@ -174,7 +174,7 @@ export class AnalysisBook {
       submittedAt: a.submittedAt,
       expiresAt: a.expiresAt,
       referencePrice: a.referencePrice,
-      ...(r ? { result: { status: r.status, hit: r.hit, movePct: r.movePct, resolvedAt: r.resolvedAt } } : {}),
+      ...(r ? { result: { status: r.status, hit: r.hit, movePct: r.movePct, resolvedAt: r.resolvedAt, plans: r.plans } } : {}),
     });
     const open = this.open.map((o) => item(o.analysis));
     const done = this.results.slice(-KEEP_BRIEF).reverse().flatMap((r) => {

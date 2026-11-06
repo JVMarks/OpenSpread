@@ -654,6 +654,6 @@ export interface AnalysesBrief {
     submittedAt: number;
     expiresAt: number;
     referencePrice: number;
-    result?: Pick<AnalysisResult, 'status' | 'hit' | 'movePct' | 'resolvedAt'>;
+    result?: Pick<AnalysisResult, 'status' | 'hit' | 'movePct' | 'resolvedAt' | 'plans'>;
   }>;
 }

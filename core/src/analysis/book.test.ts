@@ -158,5 +158,7 @@ describe('estado', () => {
     const brief = b.brief();
     expect(brief.items[0]).toMatchObject({ pair: 'BTC/USDT', model: 'claude' });
     expect(JSON.stringify(brief)).not.toContain('Motivo.');
+    for (let t = 600_000; t <= H; t += 600_000) b.tick(market(101), T0 + t);
+    expect(b.brief().items[0].result).toMatchObject({ status: 'resolved', hit: true, plans: [{ label: 'A', status: 'closed' }] });
   });
 });
