@@ -382,7 +382,7 @@ export class LiveManager {
     }
     if (x.status === 'imbalanced') {
       this.setExposures(x.exposures);
-      this.halt('Uma perna não casou com a outra. Veja a exposição.');
+      this.halt('Uma perna não casou com a outra.');
     } else if (x.status === 'unknown') {
       this.setExposures(x.exposures);
       this.halt(`Não deu para confirmar a ordem: ${x.message}. Confira nas corretoras.`);
