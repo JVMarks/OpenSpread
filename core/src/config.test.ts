@@ -178,3 +178,24 @@ describe('arquivo de configuração', () => {
     expect(logs.join()).toContain('fakex');
   });
 });
+
+describe('nostr no config', () => {
+  const base = () => ({ exchanges: ['binance', 'okx'], pairs: ['USDC/USDT'], pollMs: 10000, alerts: [], transfer: { sizeUsd: 1000, withdrawFees: {} } });
+  const run = (nostr: unknown) => validateConfig({ ...base(), nostr }, ['binance', 'okx']);
+  it('ausente fica ausente; desligado sem relays é aceito', () => {
+    const v = validateConfig(base(), ['binance', 'okx']);
+    expect(v.ok && v.config.nostr).toBeUndefined();
+    expect(run({ enabled: false, relays: [] })).toMatchObject({ ok: true, config: { nostr: { enabled: false, relays: [] } } });
+  });
+  it('só wss://, sem repetir, até 8', () => {
+    expect(run({ enabled: true, relays: ['wss://relay.damus.io', ' wss://relay.damus.io '] })).toMatchObject({ ok: true, config: { nostr: { relays: ['wss://relay.damus.io'] } } });
+    expect(run({ enabled: true, relays: ['ws://relay.damus.io'] }).ok).toBe(false);
+    expect(run({ enabled: true, relays: Array.from({ length: 9 }, (_, i) => `wss://r${i}.example`) }).ok).toBe(false);
+  });
+  it('ligado sem relay, campo desconhecido ou formato errado recusa', () => {
+    expect(run({ enabled: true, relays: [] }).ok).toBe(false);
+    expect(run({ enabled: true, relays: ['wss://a.b'], nsec: 'x' }).ok).toBe(false);
+    expect(run({ enabled: 'sim', relays: [] }).ok).toBe(false);
+    expect(run('wss://a.b').ok).toBe(false);
+  });
+});

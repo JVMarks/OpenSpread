@@ -1,10 +1,11 @@
 // Configuração do núcleo: quais corretoras, quais pares e de quanto em quanto tempo ler. Fica em
 // ~/.openspread/config.json (ou no caminho de OPENSPREAD_CONFIG). Nunca guarda chave: campo desconhecido é recusado.
+import { validRelayUrl } from './nostr/relays';
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { normalizeAddress } from './wallets/address';
-import type { AgendaImpact, ConfigLimits, CoreConfig, DiscoveryConfig, EngineConfig, RadarConfig, SpreadAlert, TransferConfig, UserEvent, WalletChain, WalletRef } from './types';
+import type { AgendaImpact, ConfigLimits, CoreConfig, DiscoveryConfig, EngineConfig, RadarConfig, SpreadAlert, TransferConfig, UserEvent, WalletChain, WalletRef , NostrConfig } from './types';
 
 export const DEFAULT_CONFIG: Readonly<CoreConfig> = Object.freeze({
   exchanges: ['binance', 'okx', 'bybit', 'kraken', 'coinbaseexchange'],
@@ -37,7 +38,7 @@ const MAX_FEE = 1_000_000;
 const MAX_FEE_ENTRIES = 200;
 const ASSET = /^[A-Z0-9]{2,12}$/;
 
-const FIELDS = new Set(['exchanges', 'pairs', 'pollMs', 'alerts', 'transfer', 'wallets', 'discovery', 'events', 'radar', 'engine']);
+const FIELDS = new Set(['exchanges', 'pairs', 'pollMs', 'alerts', 'transfer', 'wallets', 'discovery', 'events', 'radar', 'engine', 'nostr']);
 const ENGINE_FIELDS = new Set(['enabled', 'policy', 'totalUsd', 'reservePct', 'capPct', 'minUsd', 'latencyMs', 'cooldownMs']);
 const POLICY_FIELDS = new Set(['maxTradeUsd', 'minNetPct', 'maxQuoteAgeMs', 'dailyLossLimitUsd', 'allowedPairs']);
 
@@ -135,11 +136,12 @@ export function validateConfig(raw: unknown, known: readonly string[]): Validati
   const discovery = validateDiscovery(r.discovery, errors);
   const events = validateEvents(r.events, pairs, errors);
   const radar = validateRadar(r.radar, errors);
+  const nostr = validateNostr(r.nostr, errors);
   const engine = validateEngine(r.engine, pairs, errors);
 
   return errors.length
     ? { ok: false, errors }
-    : { ok: true, config: { exchanges, pairs, pollMs, alerts, transfer, wallets, ...(discovery ? { discovery } : {}), ...(events ? { events } : {}), ...(radar ? { radar } : {}), ...(engine ? { engine } : {}) } };
+    : { ok: true, config: { exchanges, pairs, pollMs, alerts, transfer, wallets, ...(discovery ? { discovery } : {}), ...(events ? { events } : {}), ...(radar ? { radar } : {}), ...(engine ? { engine } : {}), ...(nostr ? { nostr } : {}) } };
 }
 
 /** `engine` ausente = motor desligado. Todos os limites são obrigatórios: nada de limite implícito numa trava de risco. */
@@ -370,6 +372,28 @@ export function feedUrl(raw: string): string | null {
   } catch {
     return null;
   }
+}
+
+/** `nostr` ausente = desligado. Só wss://, até 8 relays, sem repetir. */
+export function validateNostr(raw: unknown, errors: string[]): NostrConfig | undefined {
+  if (raw === undefined) return undefined;
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    errors.push('"nostr" precisa ser um objeto { enabled, relays }');
+    return undefined;
+  }
+  const r = raw as Record<string, unknown>;
+  const extra = Object.keys(r).filter((k) => k !== 'enabled' && k !== 'relays');
+  if (extra.length) errors.push(`campo desconhecido em nostr: ${extra.join(', ')}`);
+  if (typeof r.enabled !== 'boolean') errors.push('"nostr.enabled" precisa ser true ou false');
+  if (!Array.isArray(r.relays) || !r.relays.every((x) => typeof x === 'string')) {
+    errors.push('"nostr.relays" precisa ser uma lista de endereços wss://');
+    return undefined;
+  }
+  const relays = [...new Set(r.relays.map((x) => x.trim()))];
+  if (relays.length > 8) errors.push('no máximo 8 relays');
+  for (const url of relays) if (!validRelayUrl(url)) errors.push(`relay inválido (use wss://): ${url.slice(0, 80)}`);
+  if (r.enabled === true && !relays.length) errors.push('Nostr ligado precisa de ao menos um relay');
+  return { enabled: r.enabled === true, relays };
 }
 
 /** `radar` ausente = desligado. Até 10 feeds e 20 palavras. */

@@ -135,6 +135,8 @@ export interface CoreConfig {
   radar?: RadarConfig;
   /** Motor de paper trading. Ausente = desligado. */
   engine?: EngineConfig;
+  /** Nostr: relays do usuário. Ausente = desligado. */
+  nostr?: NostrConfig;
 }
 
 export interface ConfigLimits {
@@ -656,4 +658,26 @@ export interface AnalysesBrief {
     referencePrice: number;
     result?: Pick<AnalysisResult, 'status' | 'hit' | 'movePct' | 'resolvedAt' | 'plans'>;
   }>;
+}
+
+// --- Nostr (etapa 6). Quem assina é a extensão do navegador (NIP-07); o núcleo nunca vê chave privada. ---
+
+export interface NostrConfig {
+  enabled: boolean;
+  /** Só wss://, até 8. */
+  relays: string[];
+}
+
+/** Evento ainda sem autor, id e assinatura: é o que vai para a extensão assinar. */
+export interface UnsignedEvent {
+  kind: number;
+  created_at: number;
+  tags: string[][];
+  content: string;
+}
+
+export interface NostrEvent extends UnsignedEvent {
+  id: string;
+  pubkey: string;
+  sig: string;
 }
