@@ -2,6 +2,8 @@
 // Uso: npm start  (porta: OPENSPREAD_PORT; arquivo de configuração: OPENSPREAD_CONFIG, padrão ~/.openspread/config.json)
 import ccxt from 'ccxt';
 import { AnalysisBook } from './analysis/book';
+import { NostrService } from './nostr/service';
+import { RelayPool } from './nostr/relays';
 import { SpreadAlerts } from './alerts';
 import { applyTransfer } from './transfer';
 import { SpreadHistory } from './history';
@@ -122,13 +124,22 @@ log(engine.enabled() ? `motor de paper ligado (simulado, sem ordem real): ${conf
 // Análises do Claude/Codex do usuário: só acréscimo, ao lado do config. Preço de referência e resultado vêm daqui.
 const analyses = new AnalysisBook({ dir: join(dirname(file), 'analyses'), log });
 analyses.load();
+// Nostr: só lê e publica o que a pessoa assinou na extensão. Nenhuma chave privada passa por aqui.
+const nostr = new NostrService({
+  dir: join(dirname(file), 'nostr'),
+  config: () => config.nostr,
+  analysis: (id) => analyses.find(id),
+  pool: (relays) => new RelayPool(relays, { onRequest: (relay, ms) => usage.record(new URL(relay).host, Date.now(), ms) }),
+  log,
+});
+nostr.load();
 /** Estado servido: o do Poller com o custo de transferência da configuração em cada melhor spread. */
 const history = new SpreadHistory();
 const historyFile = join(dirname(file), 'history.json');
 history.load(historyFile, Date.now());
 const current = (): CoreState => {
   const s = poller.state();
-  const out: CoreState = { ...s, rev: s.rev + watcher.rev + agenda.rev + engine.rev + analyses.rev, pairs: history.apply(applyTransfer(s.pairs, config.transfer), s.at) };
+  const out: CoreState = { ...s, rev: s.rev + watcher.rev + agenda.rev + engine.rev + analyses.rev + nostr.rev, pairs: history.apply(applyTransfer(s.pairs, config.transfer), s.at) };
   if (engine.enabled()) out.engine = engine.state(s.at);
   if (watcher.hasWallets()) out.wallets = watcher.state(s.at);
   out.agenda = agenda.state(config, s.at);
@@ -211,6 +222,15 @@ const server = startServer(() => ({ ...current(), alerts: alerts.events() }), {
   analyses: {
     submit: (raw) => analyses.submit(raw, current().pairs, Date.now()),
     state: () => analyses.state(Date.now()),
+  },
+  nostr: {
+    state: () => nostr.state(),
+    identity: (raw) => nostr.setIdentity(raw),
+    prepare: (raw) => nostr.prepare(raw),
+    publish: (raw) => nostr.publish(raw),
+    thread: (id) => nostr.thread(id),
+    zapPrepare: (raw) => nostr.zapPrepare(raw),
+    zapInvoice: (raw) => nostr.zapInvoice(raw),
   },
 });
 server.on('listening', () => log(`OpenSpread core em http://127.0.0.1:${port} (dados públicos de mercado; sem chave, sem ordem)`));

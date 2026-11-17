@@ -74,6 +74,26 @@ describe('lista fechada de ferramentas', () => {
   });
 });
 
+describe('Nostr não aparece no MCP (decisão do diretor)', () => {
+  it('nenhuma ferramenta fala com /v1/nostr nem publica', async () => {
+    const seen: string[] = [];
+    const base = fakeCore().core;
+    const core: CoreClient = {
+      get: (path) => {
+        seen.push(path);
+        return base.get(path);
+      },
+      post: (path, body) => {
+        seen.push(path);
+        return base.post(path, body);
+      },
+    };
+    for (const t of TOOLS) await callTool(t.name, { id: 'bot-1', pair: 'BTC/USDT', exchanges: ['a', 'b'] }, core);
+    expect(seen.filter((p) => p.includes('nostr'))).toEqual([]);
+    expect(TOOLS.map((t) => t.name).join()).not.toMatch(/nostr|publish|zap|note/);
+  });
+});
+
 describe('leitura', () => {
   it('get_market filtra por par', async () => {
     const { core } = fakeCore();

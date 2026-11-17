@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import type { AddressInfo } from 'node:net';
 import http from 'node:http';
-import { startServer, type ConfigHandlers, type EngineHandlers } from './server';
+import { startServer, type ConfigHandlers, type EngineHandlers, type NostrHandlers } from './server';
 import { DEFAULT_CONFIG, LIMITS, validateConfig } from './config';
 import type { SubmitResult } from './analysis/book';
 import type { AnalysesState, Analysis, CoreConfig, CoreState, EngineBot } from './types';
@@ -300,5 +300,49 @@ describe('rotas de análises', () => {
     const r = await post(await start2(() => ({ ok: true, analysis: { id: 'a_1' } as Analysis })));
     expect(r.status).toBe(201);
     expect(await r.json()).toEqual({ id: 'a_1' });
+  });
+});
+
+describe('rotas do Nostr', () => {
+  const calls: string[] = [];
+  const r = (name: string, status = 200) => {
+    calls.push(name);
+    return { status, body: { name } };
+  };
+  const nostr: NostrHandlers = {
+    state: () => ({ enabled: true }),
+    identity: () => r('identity'),
+    prepare: () => r('prepare'),
+    publish: () => Promise.resolve(r('publish', 201)),
+    thread: (id) => Promise.resolve(r(`thread:${id.slice(0, 4)}`)),
+    zapPrepare: () => Promise.resolve(r('zapPrepare')),
+    zapInvoice: () => Promise.resolve(r('zapInvoice')),
+  };
+  const up = async () => {
+    calls.length = 0;
+    server = startServer(() => STATE, { port: 0, allowOrigins: [BULLROOM], nostr });
+    await new Promise<void>((done) => server!.once('listening', () => done()));
+    return `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+  };
+  const post = (url: string, body: object, headers: Record<string, string> = {}) => fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', ...headers }, body: JSON.stringify(body) });
+  it('cada rota chega no seu handler', async () => {
+    const base = await up();
+    await fetch(`${base}/v1/nostr`);
+    await fetch(`${base}/v1/nostr/thread/${'a'.repeat(64)}`);
+    for (const p of ['identity', 'prepare', 'publish', 'zap/prepare', 'zap/invoice']) await post(`${base}/v1/nostr/${p}`, {});
+    expect(calls).toEqual(['thread:aaaa', 'identity', 'prepare', 'publish', 'zapPrepare', 'zapInvoice']);
+  });
+  it('corpo com nsec é recusado antes de chegar em qualquer handler', async () => {
+    const base = await up();
+    const res = await post(`${base}/v1/nostr/identity`, { pubkey: 'nsec1vl029mgpspedva04g90vltkh6fvh240zqtv9k0t9af8935ke9laqsnlfe5' });
+    expect(res.status).toBe(422);
+    expect(await res.json()).toMatchObject({ error: 'secret_refused' });
+    expect(calls).toEqual([]);
+  });
+  it('Origin fora da lista dá 403; id de thread estranho dá 404', async () => {
+    const base = await up();
+    expect((await post(`${base}/v1/nostr/publish`, {}, { Origin: 'https://evil.example' })).status).toBe(403);
+    expect((await fetch(`${base}/v1/nostr/thread/xyz`)).status).toBe(404);
+    expect(calls).toEqual([]);
   });
 });

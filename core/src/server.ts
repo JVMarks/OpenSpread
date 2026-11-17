@@ -2,11 +2,15 @@
 // mudança). CORS só para as origens do Bullroom. Sem dependências além do Node.
 // Configuração (quando ligada): GET /v1/config, POST /v1/check (confere sem gravar) e PUT /v1/config (grava e aplica).
 // Essas rotas exigem Host local (contra DNS rebinding), Origin da lista quando vier, JSON e corpo pequeno.
+// Nostr (quando ligado): /v1/nostr*, com as mesmas exigências. Corpo com chave privada (nsec) é recusado.
 // Análises (quando ligadas): POST /v1/analyses registra, GET /v1/analyses devolve tudo com o raciocínio. Mesmas exigências.
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
 import type { Validation } from './config';
 import type { SubmitResult } from './analysis/book';
+import { containsSecret } from './nostr/event';
+
+export type Reply = { status: number; body: unknown };
 import type { AnalysesState, CheckResult, ConfigInfo, CoreConfig, CoreState, EngineBot, RiskReason } from './types';
 
 export const DEFAULT_PORT = 4848;
@@ -33,6 +37,17 @@ export interface AnalysisHandlers {
   state(): AnalysesState;
 }
 
+/** Nostr (main.ts liga no NostrService). */
+export interface NostrHandlers {
+  state(): unknown;
+  identity(raw: unknown): Reply;
+  prepare(raw: unknown): Reply;
+  publish(raw: unknown): Promise<Reply>;
+  thread(id: string): Promise<Reply>;
+  zapPrepare(raw: unknown): Promise<Reply>;
+  zapInvoice(raw: unknown): Promise<Reply>;
+}
+
 export interface ServerOptions {
   port?: number;
   /** Origens que podem ler pelo navegador (o Bullroom). */
@@ -45,8 +60,11 @@ export interface ServerOptions {
   engine?: EngineHandlers;
   /** Sem isto, as rotas de análises respondem 404. */
   analyses?: AnalysisHandlers;
+  /** Sem isto, as rotas do Nostr respondem 404. */
+  nostr?: NostrHandlers;
 }
 
+const THREAD_ROUTE = /^\/v1\/nostr\/thread\/([0-9a-f]{64})$/;
 const STOP_ROUTE = /^\/v1\/engine\/bots\/([A-Za-z0-9_-]{1,64})\/stop$/;
 
 class HttpError extends Error {
@@ -178,6 +196,31 @@ export function startServer(getState: () => CoreState, opts: ServerOptions = {})
     return json(res, 201, r.analysis);
   };
 
+  const handleNostr = async (req: http.IncomingMessage, res: http.ServerResponse, path: string, nostr: NostrHandlers) => {
+    guard(req);
+    if (req.method === 'OPTIONS') {
+      res.writeHead(204, { 'Access-Control-Allow-Methods': 'GET, POST', 'Access-Control-Allow-Headers': 'Content-Type', 'Access-Control-Max-Age': '600' });
+      res.end();
+      return;
+    }
+    const reply = (r: Reply) => json(res, r.status, r.body);
+    if (req.method === 'GET') {
+      if (path === '/v1/nostr') return json(res, 200, nostr.state());
+      const thread = THREAD_ROUTE.exec(path);
+      if (thread) return reply(await nostr.thread(thread[1]));
+      throw new HttpError(404, 'not_found');
+    }
+    if (req.method !== 'POST') throw new HttpError(405, 'method_not_allowed');
+    const body = await readJson(req);
+    if (containsSecret(body)) throw new HttpError(422, 'secret_refused', ['Isto parece uma chave privada (nsec). Ela nunca deve sair da sua extensão.']);
+    if (path === '/v1/nostr/identity') return reply(nostr.identity(body));
+    if (path === '/v1/nostr/prepare') return reply(nostr.prepare(body));
+    if (path === '/v1/nostr/publish') return reply(await nostr.publish(body));
+    if (path === '/v1/nostr/zap/prepare') return reply(await nostr.zapPrepare(body));
+    if (path === '/v1/nostr/zap/invoice') return reply(await nostr.zapInvoice(body));
+    throw new HttpError(404, 'not_found');
+  };
+
   const fail = (res: http.ServerResponse) => (e: unknown) => {
     if (res.headersSent) return;
     if (e instanceof HttpError) json(res, e.status, { error: e.code, ...(e.details ? { details: e.details } : {}) });
@@ -205,6 +248,10 @@ export function startServer(getState: () => CoreState, opts: ServerOptions = {})
     }
     if (opts.engine && (path === '/v1/engine/bots' || STOP_ROUTE.test(path))) {
       handleEngine(req, res, path, opts.engine).catch(fail(res));
+      return;
+    }
+    if (opts.nostr && (path === '/v1/nostr' || path.startsWith('/v1/nostr/'))) {
+      handleNostr(req, res, path, opts.nostr).catch(fail(res));
       return;
     }
     if (opts.analyses && path === '/v1/analyses') {

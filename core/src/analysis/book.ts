@@ -149,6 +149,12 @@ export class AnalysisBook {
     return scoreboard(this.results, this.open.map((o) => ({ model: o.analysis.model, horizon: o.analysis.horizon })));
   }
 
+  /** A análise e o resultado, se já venceu. */
+  find(id: string): { analysis: Analysis; result?: AnalysisResult } | undefined {
+    const analysis = this.analyses.get(id);
+    return analysis ? { analysis, result: this.results.find((r) => r.id === id) } : undefined;
+  }
+
   state(now: number): AnalysesState {
     return {
       at: now,
