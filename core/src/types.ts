@@ -681,3 +681,41 @@ export interface NostrEvent extends UnsignedEvent {
   pubkey: string;
   sig: string;
 }
+
+/** Uma análise publicada, em GET /v1/nostr. */
+export interface NostrPublished {
+  analysisId: string;
+  eventId: string;
+  /** note1… (NIP-19), para abrir num cliente Nostr. */
+  note: string;
+  at: number;
+  pair: string;
+  horizon: string;
+  resultEventId: string | null;
+  /** Venceu e o resultado ainda não saiu: fica à vista até sair. */
+  resultPending: boolean;
+}
+
+/** Resposta de GET /v1/nostr. */
+export interface NostrInfo {
+  enabled: boolean;
+  relays: string[];
+  identity: { pubkey: string; npub: string } | null;
+  /** Mais novas primeiro. */
+  published: NostrPublished[];
+  notice: string;
+}
+
+/** Resposta de GET /v1/nostr/thread/:id. Texto de terceiros: mostrar só como texto. */
+export interface NostrThread {
+  replies: Array<{ id: string; npub: string; pubkey: string; at: number; content: string }>;
+  /** Só recibos assinados pela carteira do autor. Recibo não é prova de pagamento. */
+  zaps: { count: number; msat: number };
+  zappable: boolean;
+}
+
+/** Fatura conferida pelo núcleo (valor e hash do pedido). Quem paga é a carteira da pessoa. */
+export interface ZapInvoice {
+  pr: string;
+  msat: number;
+}

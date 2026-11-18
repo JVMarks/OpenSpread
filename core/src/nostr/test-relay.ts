@@ -42,9 +42,10 @@ export class TestRelay {
       }
     } else if (msg[0] === 'REQ') {
       const sub = msg[1] as string;
-      const filter = msg[2] as { ids?: string[]; '#e'?: string[]; kinds?: number[]; '#t'?: string[] };
+      const filter = msg[2] as { ids?: string[]; authors?: string[]; '#e'?: string[]; kinds?: number[]; '#t'?: string[] };
       const match = (e: NostrEvent) =>
         (!filter.ids || filter.ids.includes(e.id)) &&
+        (!filter.authors || filter.authors.includes(e.pubkey)) &&
         (!filter.kinds || filter.kinds.includes(e.kind)) &&
         (!filter['#e'] || e.tags.some((t) => t[0] === 'e' && filter['#e']?.includes(t[1]))) &&
         (!filter['#t'] || e.tags.some((t) => t[0] === 't' && filter['#t']?.includes(t[1])));

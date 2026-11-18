@@ -43,6 +43,12 @@ describe('analysisNote', () => {
     expect(e.content).toContain('(cortado)');
     expect(e.content).toContain('Registro pessoal, não é recomendação.');
   });
+  it('fator com valor fora da lista (registro antigo) não vira "undefined"', () => {
+    const old = { ...A, factors: [{ name: 'ETF', category: 'flow', effect: 'opposes' }] } as unknown as Analysis;
+    const e = analysisNote(old, 'pt-BR', T0);
+    expect(e.content).not.toContain('undefined');
+    expect(e.content).toContain('· ETF (flow)');
+  });
 });
 
 describe('resultReply', () => {

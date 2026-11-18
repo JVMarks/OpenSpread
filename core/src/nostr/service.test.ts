@@ -168,6 +168,24 @@ describe('thread e zaps', () => {
     expect(t.zaps).toEqual({ count: 1, msat: 21000 });
     expect(t.zappable).toBe(true);
   });
+  it('relay que ignora o filtro não troca a carteira do zap nem a thread', async () => {
+    const author = schnorr.utils.randomSecretKey();
+    const authorPub = bytesToHex(schnorr.getPublicKey(author));
+    const thief = schnorr.utils.randomSecretKey();
+    const target = 'f'.repeat(64);
+    // O relay manda o perfil de outra pessoa, mais novo, e uma resposta de outro evento, como se respondessem a este.
+    await relay.stop();
+    relay = new TestRelay({ inject: [sign({ kind: 0, created_at: 99, tags: [], content: JSON.stringify({ lud16: 'ladrao@w.example' }) }, thief), sign({ kind: 1, created_at: 5, tags: [['e', 'a'.repeat(64)]], content: 'fora do assunto' }, thief)] });
+    await relay.start();
+    config = { enabled: true, relays: [relay.url] };
+    const asked: string[] = [];
+    const s = service({ ...opts, fetch: (url: string) => (asked.push(url), wallet(url)) });
+    s.setIdentity({ pubkey: myPub });
+    relay.events.push(sign({ kind: 0, created_at: 1, tags: [], content: JSON.stringify({ lud16: 'eu@w.example' }) }, author));
+    expect((await s.zapPrepare({ eventId: target, author: authorPub, sats: 21 })).status).toBe(200);
+    expect(asked[0]).toBe(lnurlUrl);
+    expect(body(await s.thread(target)).replies).toEqual([]);
+  });
   it('zap: prepara o pedido, a extensão assina, e a fatura só sai conferida', async () => {
     const s = service(opts);
     s.setIdentity({ pubkey: myPub });

@@ -63,7 +63,8 @@ function fit(head: string, reasoning: string, tail: string, cut: string): string
 
 export function analysisNote(a: Analysis, locale: NoteLocale, now: number): UnsignedEvent {
   const t = TEXT[locale];
-  const factors = a.factors.map((f) => `${EFFECT[f.effect]} ${f.name} (${t.categories[f.category]})`).join('\n');
+  // Registro antigo com valor fora da lista não vira "undefined" na nota pública.
+  const factors = a.factors.map((f) => `${EFFECT[f.effect] ?? '·'} ${f.name} (${t.categories[f.category] ?? f.category})`).join('\n');
   const head = [
     `${t.analysis} ${a.pair} · ${a.horizon}`,
     `${t.direction}: ${a.direction === 'up' ? t.up : t.down} · ${t.conviction} ${a.conviction}%`,

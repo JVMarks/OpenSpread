@@ -4,7 +4,7 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { JsonlFile } from '../jsonl';
-import type { Analysis, AnalysisResult, NostrConfig, NostrEvent, UnsignedEvent } from '../types';
+import type { Analysis, AnalysisResult, NostrConfig, NostrEvent, NostrInfo, UnsignedEvent } from '../types';
 import { analysisNote, resultReply, type NoteLocale } from './compose';
 import { isHexKey, noteOf, npubOf, verifyEvent } from './event';
 import { RelayPool, type RelayResult } from './relays';
@@ -99,7 +99,7 @@ export class NostrService {
     return this.opts.pool ? this.opts.pool(relays) : new RelayPool(relays);
   }
 
-  state(): unknown {
+  state(): NostrInfo {
     const c = this.opts.config();
     const byAnalysis = new Map<string, { analysis?: PublishedEntry; result?: PublishedEntry }>();
     for (const e of this.entries) {
@@ -190,7 +190,8 @@ export class NostrService {
   }
 
   private async lud16Of(pubkey: string): Promise<string | null> {
-    const [profile] = (await this.pool().query({ kinds: [0], authors: [pubkey], limit: 1 })).sort((a, b) => b.created_at - a.created_at);
+    // O relay pode mandar o perfil de outra pessoa: só vale o assinado pelo próprio autor (senão o zap iria para outra carteira).
+    const [profile] = (await this.pool().query({ kinds: [0], authors: [pubkey], limit: 1 })).filter((e) => e.kind === 0 && e.pubkey === pubkey).sort((a, b) => b.created_at - a.created_at);
     if (!profile) return null;
     try {
       const lud16 = (JSON.parse(profile.content) as { lud16?: unknown }).lud16;
@@ -219,8 +220,9 @@ export class NostrService {
     if (!this.enabled) return { status: 409, body: { error: 'disabled' } };
     if (!/^[0-9a-f]{64}$/.test(eventId)) return { status: 422, body: { error: 'invalid' } };
     const pool = this.pool();
-    const [root] = await pool.query({ ids: [eventId], limit: 1 });
-    const events = await pool.query({ '#e': [eventId], kinds: [1, 9735] });
+    // Não confiar no filtro do relay: o id, o tipo e a tag e são conferidos aqui.
+    const [root] = (await pool.query({ ids: [eventId], limit: 1 })).filter((e) => e.id === eventId);
+    const events = (await pool.query({ '#e': [eventId], kinds: [1, 9735] })).filter((e) => (e.kind === 1 || e.kind === 9735) && e.id !== eventId && e.tags.some((t) => t[0] === 'e' && t[1] === eventId));
     const info = root ? await this.payInfoOf(root.pubkey) : null;
     let count = 0;
     let msat = 0;
