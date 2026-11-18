@@ -2,3 +2,7 @@ node_modules/
 .env
 .env.*
 *.log
+# Chaves e limites do modo real nunca entram no repositório.
+exchange-keys.json
+live.json
+passkey.json

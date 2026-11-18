@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import type { AddressInfo } from 'node:net';
 import http from 'node:http';
-import { startServer, type ConfigHandlers, type EngineHandlers, type NostrHandlers } from './server';
+import { startServer, type ConfigHandlers, type EngineHandlers, type LiveHandlers, type NostrHandlers } from './server';
 import { DEFAULT_CONFIG, LIMITS, validateConfig } from './config';
 import type { SubmitResult } from './analysis/book';
 import type { AnalysesState, Analysis, CoreConfig, CoreState, EngineBot } from './types';
@@ -344,5 +344,76 @@ describe('rotas do Nostr', () => {
     expect((await post(`${base}/v1/nostr/publish`, {}, { Origin: 'https://evil.example' })).status).toBe(403);
     expect((await fetch(`${base}/v1/nostr/thread/xyz`)).status).toBe(404);
     expect(calls).toEqual([]);
+  });
+});
+
+describe('rotas do modo real', () => {
+  const calls: string[] = [];
+  const reply = (name: string, status = 200) => {
+    calls.push(name);
+    return { status, body: { name } };
+  };
+  const live: LiveHandlers = {
+    state: () => ({ armed: true, balances: { okx: { USDT: 1 } } }),
+    approve: (id, raw) => reply(`approve:${id}:${JSON.stringify(raw)}`, (raw as { proof?: unknown }).proof ? 200 : 403),
+    reject: (id) => reply(`reject:${id}`),
+    stop: () => reply('stop'),
+    release: () => reply('release'),
+    unwind: () => reply('unwind'),
+    registrationChallenge: () => reply('challenge'),
+    register: () => reply('register', 201),
+  };
+  const up = async () => {
+    calls.length = 0;
+    server = startServer(() => STATE, { port: 0, allowOrigins: [BULLROOM], live });
+    await new Promise<void>((r) => server!.once('listening', () => r()));
+    return `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+  };
+  const post = (url: string, body?: object, headers: Record<string, string> = {}) => fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', ...headers }, body: body ? JSON.stringify(body) : undefined });
+
+  it('sem handlers responde 404', async () => {
+    expect((await fetch(`${await start()}/v1/live`)).status).toBe(404);
+  });
+  it('o saldo sai só por /v1/live, e /v1/state não leva', async () => {
+    const base = await up();
+    expect(await (await fetch(`${base}/v1/live`)).json()).toMatchObject({ balances: { okx: { USDT: 1 } } });
+    expect(JSON.stringify(await (await fetch(`${base}/v1/state`)).json())).not.toContain('balances');
+  });
+  it('Host estranho não lê o saldo: 403', async () => {
+    const base = new URL(await up());
+    const status = await new Promise<number>((resolve, reject) => {
+      const req = http.request({ host: '127.0.0.1', port: base.port, path: '/v1/live', method: 'GET', headers: { Host: 'evil.example' } }, (res) => {
+        res.resume();
+        resolve(res.statusCode ?? 0);
+      });
+      req.on('error', reject);
+      req.end();
+    });
+    expect(status).toBe(403);
+  });
+  it('Origin fora da lista não aprova nem para', async () => {
+    const base = await up();
+    const evil = { Origin: 'https://evil.example' };
+    expect((await post(`${base}/v1/live/tickets/t_1/approve`, { proof: 1 }, evil)).status).toBe(403);
+    expect((await post(`${base}/v1/live/stop`, {}, evil)).status).toBe(403);
+    expect(calls).toEqual([]);
+  });
+  it('aprovar sem prova dá 403 e corpo não-JSON dá 415', async () => {
+    const base = await up();
+    expect((await post(`${base}/v1/live/tickets/t_1/approve`, {})).status).toBe(403);
+    expect((await fetch(`${base}/v1/live/tickets/t_1/approve`, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: 'x' })).status).toBe(415);
+  });
+  it('cada rota chega no seu handler, e id estranho não vira rota', async () => {
+    const base = await up();
+    await post(`${base}/v1/live/tickets/t_1/approve`, { proof: { a: 1 } });
+    await post(`${base}/v1/live/tickets/t_1/reject`);
+    await post(`${base}/v1/live/stop`);
+    await post(`${base}/v1/live/release`, {});
+    await post(`${base}/v1/live/unwind`, { index: 0 });
+    await post(`${base}/v1/live/passkey`, {});
+    await fetch(`${base}/v1/live/passkey`);
+    expect(calls).toEqual(['approve:t_1:{"proof":{"a":1}}', 'reject:t_1', 'stop', 'release', 'unwind', 'register', 'challenge']);
+    expect((await post(`${base}/v1/live/tickets/..%2Fconfig/approve`, {})).status).toBe(404);
+    expect((await post(`${base}/v1/live/config`, {})).status).toBe(404);
   });
 });

@@ -74,6 +74,25 @@ describe('lista fechada de ferramentas', () => {
   });
 });
 
+describe('modo real não aparece no MCP', () => {
+  it('nenhuma ferramenta fala com /v1/live, nem no texto', async () => {
+    const seen: string[] = [];
+    const core: CoreClient = {
+      get: (path) => {
+        seen.push(path);
+        return fakeCore().core.get(path);
+      },
+      post: (path, body) => {
+        seen.push(path);
+        return fakeCore().core.post(path, body);
+      },
+    };
+    for (const t of TOOLS) await callTool(t.name, { id: 'bot-1', pair: 'BTC/USDT', exchanges: ['a', 'b'] }, core);
+    expect(seen.filter((p) => p.includes('live'))).toEqual([]);
+    expect(JSON.stringify(TOOLS.map((t) => [t.name, t.inputSchema]))).not.toMatch(/\/v1\/live|ticket|approve/);
+  });
+});
+
 describe('Nostr não aparece no MCP (decisão do diretor)', () => {
   it('nenhuma ferramenta fala com /v1/nostr nem publica', async () => {
     const seen: string[] = [];

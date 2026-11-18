@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { HARD_LIMITS } from '../live/limits';
 import { checkBatch, checkTrade, fingerprint, type ProposedTrade, type RiskContext } from './risk';
 import type { RiskPolicy } from '../types';
 
@@ -65,7 +66,7 @@ describe('trava de risco: uma operação', () => {
   });
 
   it('recusa modo que não seja paper, mesmo vindo de JSON sem tipo', () => {
-    expect(codes({ ...TRADE, mode: 'live' as unknown as 'paper' }, ctx())).toEqual(['mode_not_paper']);
+    expect(codes({ ...TRADE, mode: 'real' as unknown as 'paper' }, ctx())).toEqual(['mode_invalid']);
   });
 
   it('junta todas as razões no mesmo veredito', () => {
@@ -125,5 +126,39 @@ describe('impressão digital', () => {
     const amanha = NOW + 86_400_000;
     const c = ctx({ now: amanha, quoteAt: { binance: amanha, kraken: amanha } });
     expect(checkTrade(TRADE, c, POLICY).fingerprint).not.toBe(hoje);
+  });
+});
+
+describe('modo real', () => {
+  const LIVE = { ...TRADE, sizeUsd: 40, mode: 'live' as const };
+  const armed = (over: Partial<NonNullable<RiskContext['live']>> = {}) => ({ ...ctx(), live: { armed: true, balanceAt: ctx().now, pending: false, tradesToday: 0, tradesPerDay: 5, ...over } });
+  it('armado e dentro dos limites passa', () => {
+    expect(codes(LIVE, armed())).toEqual([]);
+  });
+  it('paper não pede nada disso', () => {
+    expect(codes(TRADE, ctx())).toEqual([]);
+  });
+  it('sem contexto real ou desarmado bloqueia', () => {
+    expect(codes(LIVE, ctx())).toContain('live_not_armed');
+    expect(codes(LIVE, armed({ armed: false }))).toContain('live_not_armed');
+  });
+  it('saldo velho ou não lido bloqueia', () => {
+    expect(codes(LIVE, armed({ balanceAt: null }))).toEqual(['balance_stale']);
+    expect(codes(LIVE, armed({ balanceAt: ctx().now - HARD_LIMITS.balanceAgeMs - 1 }))).toEqual(['balance_stale']);
+    expect(codes(LIVE, armed({ balanceAt: ctx().now - HARD_LIMITS.balanceAgeMs }))).toEqual([]);
+  });
+  it('pendência bloqueia', () => {
+    expect(codes(LIVE, armed({ pending: true }))).toEqual(['pending_exposure']);
+  });
+  it('limite de operações por dia, e o teto do código vence o config', () => {
+    expect(codes(LIVE, armed({ tradesToday: 5 }))).toEqual(['trades_per_day_hit']);
+    expect(codes(LIVE, armed({ tradesToday: HARD_LIMITS.tradesPerDay, tradesPerDay: 9999 }))).toEqual(['trades_per_day_hit']);
+  });
+  it('tetos do código valem mesmo com política mais frouxa', () => {
+    const loose = { ...POLICY, maxTradeUsd: 1_000_000 };
+    expect(checkTrade({ ...LIVE, sizeUsd: HARD_LIMITS.maxTradeUsd + 1 }, { ...armed(), balances: { binance: { USDT: 1e9, BTC: 1e9 }, kraken: { USDT: 1e9, BTC: 1e9 } } }, loose).reasons.map((r) => r.code)).toContain('over_hard_limit');
+  });
+  it('a impressão digital muda com o modo', () => {
+    expect(fingerprint(LIVE, '2026-11-05')).not.toBe(fingerprint(TRADE, '2026-11-05'));
   });
 });
