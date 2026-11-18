@@ -23,6 +23,8 @@ scored analyses and test simulated bots. No server of ours, no tracking. *A bitc
   books, with no keys and no real orders. See below.
 - **MCP server** for your own Claude or Codex: read data, record analyses, start and stop simulated robots. No tool can place
   a real order. See below.
+- **Nostr (optional):** publish an analysis signed by your browser extension, reply with the result, read the thread and zap
+  replies. Your key never leaves the extension. See below.
 
 ## Run it
 
@@ -185,9 +187,43 @@ with a stop and targets, and its reasoning. Hit rate alone says nothing, so the 
 Analyses in a row on one asset are not independent, stablecoin pairs barely move, and `model` is only what the client declares, so
 treat the numbers as evidence, not proof. They live in `analyses/`, next to the config, on your machine. Not financial advice.
 
+## Publish analyses on Nostr (optional)
+
+Off by default. In Bullroom, open Settings › Nostr, turn it on (default relays: relay.damus.io, nos.lol and relay.primal.net),
+connect your Nostr browser extension ([NIP-07](https://github.com/nostr-protocol/nips/blob/master/07.md), such as Alby or nos2x)
+and use **Publish on Nostr** on an analysis.
+
+- **Your key stays in your extension.** The core stores only your public key (`nostr/identity.json`, next to the config) and refuses
+  any request that carries an `nsec`.
+- **What is published:** pair, horizon, direction, conviction, factors, reasoning (cut at 4,000 characters), when it was recorded,
+  the reference price, and "Personal record, not a recommendation." **Never published:** plans, entry, stop, targets, your exchanges,
+  keys or balances.
+- **You see it before you sign.** The core prepares the note, Bullroom shows the exact text, your extension signs it, and the core
+  accepts only that exact event signed by your chosen identity. Nothing is published on its own, and the MCP has no Nostr tool.
+- **Result:** when the analysis expires, the panel keeps "Result not published yet" in view until you reply to your note with the
+  outcome (a [NIP-10](https://github.com/nostr-protocol/nips/blob/master/10.md) reply).
+- **Threads and zaps:** replies are read live from the relays, not stored, and shown as plain text. Zaps
+  ([NIP-57](https://github.com/nostr-protocol/nips/blob/master/57.md)) count only receipts signed by the author's wallet, and a
+  receipt is not proof of payment. To zap a reply, the core fetches the invoice and checks the amount and the request hash (https
+  only, no private addresses, no redirects); your own wallet pays it through a `lightning:` link. The core never pays anything.
+  For your notes to receive zaps, your Nostr profile needs a Lightning address. OpenSpread never publishes your profile.
+
+**Read this before you publish:**
+
+- **Public and permanent.** Relays can keep copies forever. Deletion requests (NIP-09) are optional for relays.
+- **A signature proves who published and when, not that the analysis was right.**
+- **Selective publishing.** Publishing is manual, so anyone can publish only the calls that went well. The Bullroom scoreboard
+  counts every analysis, published or not. When you read someone's notes, check whether their results were published too.
+- **One identity.** Your npub links every note together. Use a separate key if you prefer.
+- **Rules where you live.** Publishing opinions about assets can be regulated. Not financial advice.
+
+Tested end to end with a fake extension and a local relay, and read-only against real relays (relay.damus.io, nos.lol). Publishing
+from a real extension is not tested yet.
+
 ## Roadmap
 
-Real orders with Hummingbot behind the same risk gate → Nostr for identity, signed analyses and donations.
+Nostr identity, signed analyses, threads and zaps: done (see above). Next: real orders behind the same risk gate, with approval
+per order.
 
 ## Support
 
