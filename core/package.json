@@ -14,7 +14,8 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "check:exchanges": "tsx scripts/check-exchanges.ts",
     "mcp": "node bin/openspread-mcp.mjs",
-    "live:probe": "node bin/live-probe.mjs"
+    "live:probe": "node bin/live-probe.mjs",
+    "live:sim": "node bin/live-sim.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.32.2",

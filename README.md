@@ -23,6 +23,8 @@ scored analyses and test simulated bots. No server of ours, no tracking. *A bitc
   books, with no keys and no real orders. See below.
 - **MCP server** for your own Claude or Codex: read data, record analyses, start and stop simulated robots. No tool can place
   a real order. See below.
+- **Real orders (off by default, in testing):** per-order approval with a passkey, caps in the code, keys that cannot withdraw.
+  Not proven with real money yet. See below.
 - **Nostr (optional):** publish an analysis signed by your browser extension, reply with the result, read the thread and zap
   replies. Your key never leaves the extension. See below.
 
@@ -142,6 +144,56 @@ rewritten here.
 
 This is software, not investment advice.
 
+## Real orders (off by default, in testing)
+
+**Not proven with real money yet.** The code is here, off by default, and so far tested only against a fake exchange and a
+simulated one (see below). Testnet and a first minimal real order come next. Until then, do not arm it with real keys.
+
+It arms only with all three: `OPENSPREAD_LIVE=1`, a `live.json` next to the config, and exchange keys in `exchange-keys.json`
+(also next to the config, outside any repository) or in `OPENSPREAD_<EXCHANGE>_API_KEY` / `_SECRET` / `_PASSWORD`. Without any of
+them, nothing touches a key or opens an authenticated connection.
+
+```json
+{
+  "sandbox": true,
+  "routes": [{ "pair": "BTC/USDT", "exchanges": ["okx", "bybit"] }],
+  "maxTradeUsd": 20,
+  "minNetPct": 0.1,
+  "maxQuoteAgeMs": 5000,
+  "dailyLossLimitUsd": 10,
+  "tradesPerDay": 5,
+  "maxSlippagePct": 0.2
+}
+```
+
+- **Exchanges:** Binance, OKX and Bybit (spot). The core refuses a key that can withdraw, by reading each exchange's key
+  restrictions; when it cannot tell, it refuses too.
+- **Caps in the code, not in the config:** US$ 50 per trade, US$ 25 loss per day, 20 trades per day, one open ticket, 0.5%
+  maximum slippage. `live.json` can only go lower.
+- **A person approves every order.** Each opportunity becomes a full-screen ticket in Bullroom with what will be sent, valid for 20
+  seconds, approved with a passkey (Windows Hello) on `localhost`. No key press approves, and Approve unlocks after 1.5 s. Register
+  the passkey once with `OPENSPREAD_LIVE_REGISTER=1`.
+- **How orders go out:** two limit IOC orders at the same time, price locked at the ticket quote plus the slippage, never market,
+  never resent. A balance read within 30 seconds is required.
+- **When a leg fails,** everything stops and the exposure stays on screen until you close it (also with approval). If an answer is
+  lost, the core looks the order up by its own id and, without an answer, reports the exposure as unknown instead of guessing.
+  The intent is written to `live/ledger.jsonl` before sending, so a restart reconciles.
+- **Not covered:** moving funds between exchanges, fees charged in another currency (the public fee is used and marked as
+  estimated), and anything outside the configured routes.
+- **The MCP has no real-order tool,** and a test fails if one is added. Do not run an agent with a free shell on the machine
+  that holds exchange keys.
+
+### Simulate the orders without keys
+
+```bash
+cd core && npm run live:sim -- --pair BTC/USDT --buy okx --sell bybit --usd 50
+```
+
+Runs the real order engine against simulated exchanges that use the real markets (step and minimum order) and the live public
+order books: each IOC order fills level by level within its locked price, and the rest is cancelled. Balances are made up and
+nothing is sent. It walks five cases: both legs filled, one leg out of range (then closing the exposure), a balance too short, a
+lost reply, and an exchange that does not answer. On spot pairs with fees, the result is usually a small loss, and it shows.
+
 ## Connect Claude or Codex (MCP)
 
 With the core running (`npm start`), register the server with your own client. Use the full path to your clone:
@@ -222,8 +274,8 @@ from a real extension is not tested yet.
 
 ## Roadmap
 
-Nostr identity, signed analyses, threads and zaps: done (see above). Next: real orders behind the same risk gate, with approval
-per order.
+Nostr identity, signed analyses, threads and zaps: done (see above). Real orders with approval per order: built and in testing
+(simulated now; testnet and a first minimal real order next).
 
 ## Support
 

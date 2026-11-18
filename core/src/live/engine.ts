@@ -97,7 +97,15 @@ export class LiveEngine {
   /** Mesma quantidade nas duas pernas, no passo mais grosso. */
   private quantity(req: LiveRequest, buy: LiveClient, sell: LiveClient): number {
     const raw = req.sizeUsd / req.quotedAsk;
-    return Math.min(Number(buy.amountToPrecision(req.pair, raw)), Number(sell.amountToPrecision(req.pair, raw)));
+    // O CCXT lança erro (InvalidOrder) para quantidade abaixo do passo, em vez de devolver zero. Zero aqui: nenhuma ordem sai.
+    const step = (c: LiveClient): number => {
+      try {
+        return Number(c.amountToPrecision(req.pair, raw));
+      } catch {
+        return 0;
+      }
+    };
+    return Math.min(step(buy), step(sell));
   }
 
   private limits(req: LiveRequest, buy: LiveClient, sell: LiveClient): { buy: number; sell: number } {

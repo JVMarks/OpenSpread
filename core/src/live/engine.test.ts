@@ -43,6 +43,16 @@ const setup = () => {
 };
 
 describe('as ordens', () => {
+  it('tamanho abaixo do passo, quando a corretora lança erro como o CCXT: nada sai, sem parada', async () => {
+    const { a, b, engine } = setup();
+    a.amountToPrecision = () => {
+      throw new Error('amount must be greater than minimum amount precision');
+    };
+    const r = await engine.execute(REQ);
+    expect(r).toEqual({ status: 'no_fill', at: 7, reasons: ['Tamanho abaixo do passo mínimo da corretora.'] });
+    expect(a.created).toEqual([]);
+    expect(b.created).toEqual([]);
+  });
   it('duas IOC limitadas, uma em cada corretora, com preço travado; nunca a mercado', async () => {
     const { a, b, engine } = setup();
     await engine.execute(REQ);
