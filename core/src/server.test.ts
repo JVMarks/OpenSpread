@@ -339,6 +339,15 @@ describe('rotas do Nostr', () => {
     expect(await res.json()).toMatchObject({ error: 'secret_refused' });
     expect(calls).toEqual([]);
   });
+  it('corpo fora de UTF-8 é recusado, em vez de gravar "�"', async () => {
+    const base = await up();
+    // "Análise" em Latin-1: o byte 0xE1 sozinho não é UTF-8 válido.
+    const latin1 = Buffer.concat([Buffer.from('{"pubkey":"An'), Buffer.from([0xe1]), Buffer.from('lise"}')]);
+    const res = await fetch(`${base}/v1/nostr/identity`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: latin1 });
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({ error: 'invalid_encoding' });
+    expect(calls).toEqual([]);
+  });
   it('Origin fora da lista dá 403; id de thread estranho dá 404', async () => {
     const base = await up();
     expect((await post(`${base}/v1/nostr/publish`, {}, { Origin: 'https://evil.example' })).status).toBe(403);

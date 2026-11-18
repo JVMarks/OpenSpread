@@ -113,8 +113,17 @@ function readJson(req: http.IncomingMessage): Promise<unknown> {
     });
     req.on('end', () => {
       if (over) return;
+      let text: string;
       try {
-        resolve(JSON.parse(Buffer.concat(chunks).toString('utf8')));
+        // Fora de UTF-8 é recusado: trocar os bytes por "�" gravaria texto estragado num registro que não se edita
+        // (visto com o curl do Git Bash no Windows, que mandava os acentos em outra codificação).
+        text = new TextDecoder('utf-8', { fatal: true }).decode(Buffer.concat(chunks));
+      } catch {
+        reject(new HttpError(400, 'invalid_encoding', ['Mande o corpo em UTF-8.']));
+        return;
+      }
+      try {
+        resolve(JSON.parse(text));
       } catch {
         reject(new HttpError(400, 'invalid_json'));
       }
